@@ -1,0 +1,38 @@
+# gradle
+
+.gradle/
+build/
+out/
+classes/
+_import/
+
+# idea
+
+.idea/
+idea/
+*.iml
+*.ipr
+*.iws
+
+# vscode
+
+.settings/
+.vscode/
+bin/
+.classpath
+.project
+
+# fabric
+
+run/
+common/run/
+fabric/run/
+frapi/run/
+# macOS
+
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Kotlin compiler working directory
+.kotlin
