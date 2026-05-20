@@ -1,0 +1,83 @@
+{
+  "schemaVersion" : 1,
+  "id" : "mercurizer",
+  "version" : "${version}",
+  "name" : "Mercurizer",
+  "description" : "Mercurizer is a rendering fork tuned for low-end PCs, integrated graphics, lower memory pressure, smoother frame times, and safer laptop behavior",
+  "authors" : [
+    {
+      "name" : "Zellior"
+    },
+    {
+      "name" : "Edonme",
+      "contact" : {
+        "homepage" : "https://edonme.dev/"
+      }
+    }
+  ],
+  "contributors" : [
+    "JellySquid"
+  ],
+  "contact" : {
+    "homepage" : "https://edonme.dev/"
+  },
+  "license" : "LGPL-3.0",
+  "icon" : "mercurizer-icon.png",
+  "environment" : "client",
+  "entrypoints" : {
+    "client" : [
+      "net.caffeinemc.mods.sodium.fabric.MercurizerFabricMod"
+    ],
+    "preLaunch" : [
+      "net.caffeinemc.mods.sodium.fabric.MercurizerPreLaunch"
+    ]
+  },
+  "custom" : {
+    "fabric-renderer-api-v1:contains_renderer" : true
+  },
+  "accessWidener" : "mercurizer-fabric.accesswidener",
+  "mixins" : [
+    "mercurizer-common.mixins.json",
+    "mercurizer-frapi.mixins.json",
+    "mercurizer-fabric.mixins.json"
+  ],
+  "depends" : {
+    "fabricloader" : ">=0.16.0",
+    "fabric-block-view-api-v2" : "*",
+    "fabric-rendering-fluids-v1" : ">=2.0.0",
+    "fabric-resource-loader-v0" : "*"
+  },
+  "breaks" : {
+    "embeddium": "*",
+    "optifabric" : "*",
+    "canvas" : "*",
+    "vulkanmod": "*",
+    "optimalaim": "<2.0.0",
+    "sodium-blendingregistry" : "*",
+    "ocrenderfix_sodium" : "*",
+    "betterfpsdist" : "<=1.21-4.5",
+    "bobby" : "<5.2.4",
+    "chunksfadein" : "<2.0.2-1.21.2",
+    "cull-less-leaves" : "<=1.3.0",
+    "cullleaves" : "<=3.4.0-fabric",
+    "custom_hud" : "<3.4.2",
+    "farsight" : "<=1.21-4.3",
+    "iceberg" : "<1.2.7",
+    "iris" : "<=1.10.6",
+    "movingelevators" : "<=1.4.7",
+    "notenoughcrashes" : "<4.4.8",
+    "noxesium" : "<2.3.3",
+    "reeses-sodium-options" : "<2.0.2",
+    "fabric-api": "<0.140.0",
+    "sodium-extra" : "<0.8.0",
+    "audio_engine_tweaks" : "<1.2.12",
+    "sspb" : "<6.0.0",
+    "moreculling": "<1.6.0-beta.2",
+    "simply-no-shading": "<7.6.2",
+    "betterend" : "<=21.0.11",
+    "enchanteds_sodium_options" : "<1.0.1"
+  },
+  "provides" : [
+    "indium"
+  ]
+}
