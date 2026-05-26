@@ -57,6 +57,11 @@ public class MercurizerMixinPlugin implements IMixinConfigPlugin {
         }
 
         String mixin = mixinClassName.substring(MIXIN_PACKAGE_ROOT.length());
+
+        if (mixin.startsWith("addon.")) {
+            return true;
+        }
+
         MixinOption option = this.config.getEffectiveOptionForMixin(mixin);
 
         if (option == null) {

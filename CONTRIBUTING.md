@@ -4,8 +4,7 @@ By submitting a pull request, you agree that your contribution may be distribute
 
 ## Attribution
 
-- Mercurizer authors: [Edonme](https://edonme.dev/)
-- Original Sodium author: JellySquid
+- Mercurizer authors: Zellior and pxdritz ([Edonme](https://edonme.dev/))
 
 ## Code Style
 

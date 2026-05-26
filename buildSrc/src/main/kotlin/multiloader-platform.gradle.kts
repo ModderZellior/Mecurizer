@@ -3,14 +3,6 @@ plugins {
     id("maven-publish")
 }
 
-val configurationDesktopIntegrationJava: Configuration = configurations.create("commonDesktopIntegration") {
-    isCanBeResolved = true
-}
-
-dependencies {
-    configurationDesktopIntegrationJava(project(path = ":common", configuration = "commonDesktopJava"))
-}
-
 tasks {
     processResources {
         inputs.property("version", version)
@@ -23,30 +15,24 @@ tasks {
     jar {
         duplicatesStrategy = DuplicatesStrategy.FAIL
         from(rootDir.resolve("LICENSE.md"))
-
-        // Entry-point for desktop integration when the file is executed directly
-        from(configurationDesktopIntegrationJava)
-        manifest.attributes["Main-Class"] = "net.caffeinemc.mods.sodium.desktop.LaunchWarn"
     }
 }
 
 publishing {
-    // Each platform is responsible for their own "publications".
-
     repositories {
         val isReleaseBuild = project.hasProperty("build.release")
-        val caffeineMCMavenUsername: String? by project // reads from ORG_GRADLE_PROJECT_caffeineMCMavenUsername
-        val caffeineMCMavenPassword: String? by project // reads from ORG_GRADLE_PROJECT_caffeineMCMavenPassword
+        val mercurizerMavenUsername: String? by project
+        val mercurizerMavenPassword: String? by project
 
         maven {
-            name = "CaffeineMC"
+            name = "Mercurizer"
             url = uri("https://maven.caffeinemc.net".let {
                 if (isReleaseBuild) "$it/releases" else "$it/snapshots"
             })
 
             credentials {
-                username = caffeineMCMavenUsername
-                password = caffeineMCMavenPassword
+                username = mercurizerMavenUsername
+                password = mercurizerMavenPassword
             }
         }
     }
