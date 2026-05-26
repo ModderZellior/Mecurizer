@@ -1,32 +1,14 @@
 package net.caffeinemc.mods.sodium.fabric;
 
-import net.caffeinemc.mods.sodium.client.SodiumClientMod;
-import net.caffeinemc.mods.sodium.client.config.ConfigManager;
-import net.caffeinemc.mods.sodium.client.services.FRAPIProvider;
-import net.caffeinemc.mods.sodium.client.util.FlawlessFrames;
-import net.caffeinemc.mods.sodium.fabric.config.ConfigLoaderFabric;
 import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.loader.api.FabricLoader;
-import net.fabricmc.loader.api.ModContainer;
-import java.util.function.Consumer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class MercurizerFabricMod implements ClientModInitializer {
+    private static final Logger LOGGER = LoggerFactory.getLogger("Mercurizer");
+
     @Override
-    @SuppressWarnings("unchecked")
     public void onInitializeClient() {
-        ModContainer mod = FabricLoader.getInstance()
-                .getModContainer("mercurizer")
-                .orElseThrow(NullPointerException::new);
-
-        SodiumClientMod.onInitialization(mod.getMetadata().getVersion().getFriendlyString());
-
-        ConfigLoaderFabric.collectConfigEntryPoints();
-        ConfigManager.registerConfigsEarly();
-
-        FabricLoader.getInstance()
-                .getEntrypoints("frex_flawless_frames", Consumer.class)
-                .forEach(api -> api.accept(FlawlessFrames.getProvider()));
-
-        FRAPIProvider.getInstance().register();
+        LOGGER.info("Mercurizer addon active");
     }
 }

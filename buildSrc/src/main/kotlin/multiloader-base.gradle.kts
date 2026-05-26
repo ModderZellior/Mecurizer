@@ -3,7 +3,7 @@ plugins {
     id("idea")
 }
 
-group = "net.caffeinemc"
+group = "net.mercurizer"
 version = BuildConfig.createVersionString(project)
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(25)
