@@ -3,7 +3,7 @@
   "id" : "mercurizer",
   "version" : "${version}",
   "name" : "Mercurizer",
-  "description" : "Mercurizer is a rendering fork tuned for low-end PCs, integrated graphics, lower memory pressure, smoother frame times, and safer laptop behavior",
+  "description" : "Mercurizer is a Sodium addon tuned for low-end PCs, integrated graphics, lower memory pressure, smoother frame times, and safer laptop behavior",
   "authors" : [
     {
       "name" : "Zellior"
@@ -15,9 +15,6 @@
       }
     }
   ],
-  "contributors" : [
-    "JellySquid"
-  ],
   "contact" : {
     "homepage" : "https://edonme.dev/"
   },
@@ -27,25 +24,15 @@
   "entrypoints" : {
     "client" : [
       "net.caffeinemc.mods.sodium.fabric.MercurizerFabricMod"
-    ],
-    "preLaunch" : [
-      "net.caffeinemc.mods.sodium.fabric.MercurizerPreLaunch"
     ]
-  },
-  "custom" : {
-    "fabric-renderer-api-v1:contains_renderer" : true
   },
   "accessWidener" : "mercurizer-fabric.accesswidener",
   "mixins" : [
-    "mercurizer-common.mixins.json",
-    "mercurizer-frapi.mixins.json",
-    "mercurizer-fabric.mixins.json"
+    "mercurizer-common.mixins.json"
   ],
   "depends" : {
     "fabricloader" : ">=0.16.0",
-    "fabric-block-view-api-v2" : "*",
-    "fabric-rendering-fluids-v1" : ">=2.0.0",
-    "fabric-resource-loader-v0" : "*"
+    "sodium" : "0.8.12+mc1.21.11"
   },
   "breaks" : {
     "embeddium": "*",
@@ -76,8 +63,5 @@
     "simply-no-shading": "<7.6.2",
     "betterend" : "<=21.0.11",
     "enchanteds_sodium_options" : "<1.0.1"
-  },
-  "provides" : [
-    "indium"
-  ]
+  }
 }

@@ -2,12 +2,11 @@
 
 # Mercurizer
 
-Mercurizer is a Fabric rendering fork derived from Sodium and tuned for low-end PCs, integrated graphics, lower memory pressure, smoother frame times, and safer laptop behavior.
+Mercurizer is a Sodium addon for Fabric tuned for low-end PCs, integrated graphics, lower memory pressure, smoother frame times, and safer laptop behavior.
 
 ## Credits
 
 - Mercurizer authors: Zellior and pxdritz ([Edonme](https://edonme.dev/))
-- Original Sodium author and upstream foundation: JellySquid
 
 ## Project Structure
 
