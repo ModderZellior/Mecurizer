@@ -14,7 +14,6 @@ This repository uses a standard Gradle multi-module layout:
 
 - `common/` shared code and assets
 - `fabric/` Fabric-specific entrypoints and packaging
-- `frapi/` FRAPI integration
 - `buildSrc/` shared Gradle build logic
 - `gradle/` Gradle wrapper files
 
@@ -42,4 +41,6 @@ Built jars are written to `build/mods/`.
 
 ## License
 
-This project is licensed under the GNU Lesser General Public License v3.0. See [LICENSE.md](LICENSE.md).
+Copyright © 2026 Zellior. All Rights Reserved.
+
+You may not modify, redistribute, or resell this mod or its source code. See [LICENSE.md](LICENSE.md) for the full terms, including the modpack exception.
