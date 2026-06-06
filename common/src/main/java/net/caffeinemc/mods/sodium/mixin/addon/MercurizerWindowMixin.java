@@ -1,4 +1,4 @@
-package net.caffeinemc.mods.sodium.mixin.core;
+package net.caffeinemc.mods.sodium.mixin.addon;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
@@ -15,7 +15,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 
 @Mixin(Window.class)
-public abstract class WindowMixin implements NativeWindowHandle {
+public abstract class MercurizerWindowMixin implements NativeWindowHandle {
     @Shadow
     public abstract long handle();
 

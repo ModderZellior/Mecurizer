@@ -1,4 +1,4 @@
-package net.caffeinemc.mods.sodium.mixin.core;
+package net.caffeinemc.mods.sodium.mixin.addon;
 
 import it.unimi.dsi.fastutil.longs.LongArrayFIFOQueue;
 import net.caffeinemc.mods.sodium.client.MercurizerRuntimePolicy;
@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(Minecraft.class)
-public class MinecraftMixin {
+public class MercurizerMinecraftMixin {
     @Unique
     private final LongArrayFIFOQueue fences = new LongArrayFIFOQueue();
 
