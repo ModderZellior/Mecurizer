@@ -1,4 +1,4 @@
-package net.caffeinemc.mods.sodium.mixin.core;
+package net.caffeinemc.mods.sodium.mixin.addon;
 
 import com.mojang.blaze3d.opengl.GlBackend;
 import net.caffeinemc.mods.sodium.client.MercurizerRuntimePolicy;
@@ -9,13 +9,12 @@ import net.caffeinemc.mods.sodium.client.services.PlatformRuntimeInformation;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWNativeWin32;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(GlBackend.class)
-public abstract class WindowMixin {
+public abstract class MercurizerWindowMixin {
     @Inject(method = "setWindowHints", at = @At("RETURN"))
     public void setAdditionalWindowHints(CallbackInfo ci) {
         if (!PlatformRuntimeInformation.getInstance().platformHasEarlyLoadingScreen()) {

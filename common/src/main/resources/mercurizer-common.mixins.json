@@ -16,7 +16,7 @@
     "addon.SodiumDebugEntryMixin",
     "addon.SodiumWorldRendererMixin",
     "addon.VideoSettingsScreenMixin",
-    "core.MinecraftMixin",
-    "core.WindowMixin"
+    "addon.MercurizerMinecraftMixin",
+    "addon.MercurizerWindowMixin"
   ]
 }
