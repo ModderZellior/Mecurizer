@@ -16,11 +16,11 @@ import java.util.ArrayList;
 
 @Mixin(RenderSectionManager.class)
 public class RenderSectionManagerMixin {
-    @Shadow private int frame;
+    @Shadow private long lastFrameDuration;
 
     @Inject(method = "tickVisibleRenders", at = @At("HEAD"), cancellable = true)
     private void limitTextureAnimation(CallbackInfo ci) {
-        if (!MercurizerRuntimePolicy.shouldAnimateVisibleTexturesThisFrame(this.frame)) {
+        if (!MercurizerRuntimePolicy.shouldAnimateVisibleTexturesThisFrame(this.lastFrameDuration)) {
             ci.cancel();
         }
     }
@@ -29,7 +29,7 @@ public class RenderSectionManagerMixin {
     private ArrayList<BuilderTaskOutput> limitBuildResults(ArrayList<BuilderTaskOutput> original) {
         int max = MercurizerRuntimePolicy.getMaxUploadResultsPerFrame();
         if (original.size() > max) {
-            return new ArrayList<>(original.subList(0, max));
+            original.subList(max, original.size()).clear();
         }
         return original;
     }
