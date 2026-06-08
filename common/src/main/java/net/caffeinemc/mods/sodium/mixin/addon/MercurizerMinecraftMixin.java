@@ -20,6 +20,10 @@ public class MercurizerMinecraftMixin {
 
     @Inject(method = "runTick", at = @At("HEAD"))
     private void preRender(boolean tick, CallbackInfo ci) {
+        if (!MercurizerRuntimePolicy.preferSafeStagingPath()) {
+            return;
+        }
+
         ProfilerFiller profiler = Profiler.get();
         profiler.push("wait_for_gpu");
 
@@ -34,6 +38,10 @@ public class MercurizerMinecraftMixin {
 
     @Inject(method = "runTick", at = @At("RETURN"))
     private void postRender(boolean tick, CallbackInfo ci) {
+        if (!MercurizerRuntimePolicy.preferSafeStagingPath()) {
+            return;
+        }
+
         var fence = GL32C.glFenceSync(GL32C.GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
 
         if (fence == 0) {
