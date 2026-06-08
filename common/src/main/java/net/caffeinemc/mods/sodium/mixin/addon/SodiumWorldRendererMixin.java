@@ -18,8 +18,6 @@ public class SodiumWorldRendererMixin {
         if (original == SortBehavior.OFF) {
             return original;
         }
-        return MercurizerRuntimePolicy.preferSafeStagingPath()
-                ? SortBehavior.DYNAMIC_DEFER_ALWAYS
-                : SortBehavior.DYNAMIC_DEFER_NEARBY_ONE_FRAME;
+        return SortBehavior.DYNAMIC_DEFER_NEARBY_ONE_FRAME;
     }
 }
