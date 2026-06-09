@@ -1,4 +1,4 @@
-import org.gradle.api.Project
+﻿import org.gradle.api.Project
 
 object BuildConfig {
     val MINECRAFT_VERSION: String = "26.1.2"
@@ -7,7 +7,7 @@ object BuildConfig {
     val FABRIC_API_VERSION: String = "0.148.0+26.1.2"
     val SUPPORT_FRAPI : Boolean = true
 
-    val MOD_VERSION: String = "1.1"
+    val MOD_VERSION: String = "1.2"
 
     val RELEASE_TAG: String = "mc$MINECRAFT_VERSION-$MOD_VERSION"
 
@@ -20,12 +20,10 @@ object BuildConfig {
 
         val base = "$SODIUM_VERSION+mc$MINECRAFT_VERSION-$MOD_VERSION"
 
-        return if (isReleaseBuild) {
-            base
-        } else if (buildId != null) {
+        return if (buildId != null) {
             "$base-build.$buildId"
         } else {
-            "$base-local"
+            base
         }
     }
 
