@@ -2,12 +2,12 @@ import org.gradle.api.Project
 
 object BuildConfig {
     val MINECRAFT_VERSION: String = "26.1.1"
+    val SODIUM_VERSION: String = "0.8.9"
     val FABRIC_LOADER_VERSION: String = "0.19.2"
     val FABRIC_API_VERSION: String = "0.148.0+26.1.2"
     val SUPPORT_FRAPI : Boolean = true
 
-    // https://semver.org/
-    val MOD_VERSION: String = "0.8.12-beta.1"
+    val MOD_VERSION: String = "1.1"
 
     val RELEASE_TAG: String = "mc$MINECRAFT_VERSION-$MOD_VERSION"
 
@@ -15,29 +15,18 @@ object BuildConfig {
     val MODRINTH_PROJECT_ID = "AANobbMI"
 
     fun createVersionString(project: Project): String {
-        val builder = StringBuilder()
-
         val isReleaseBuild = project.hasProperty("build.release")
         val buildId = System.getenv("GITHUB_RUN_NUMBER")
 
-        if (isReleaseBuild) {
-            builder.append(MOD_VERSION)
+        val base = "$SODIUM_VERSION+mc$MINECRAFT_VERSION-$MOD_VERSION"
+
+        return if (isReleaseBuild) {
+            base
+        } else if (buildId != null) {
+            "$base-build.$buildId"
         } else {
-            builder.append(MOD_VERSION.substringBefore('-'))
-            builder.append("-SNAPSHOT")
+            "$base-local"
         }
-
-        builder.append("+mc").append(MINECRAFT_VERSION)
-
-        if (!isReleaseBuild) {
-            if (buildId != null) {
-                builder.append("-build.${buildId}")
-            } else {
-                builder.append("-local")
-            }
-        }
-
-        return builder.toString()
     }
 
     fun calculateGitHash(project: Project): String = try {
@@ -55,5 +44,5 @@ object BuildConfig {
             .trim()
             .replace("[ReleaseTag]()", RELEASE_TAG)
             .replace("[MCVersion]()", MINECRAFT_VERSION)
-            .replace("[SodiumVersion]()", MOD_VERSION)
+            .replace("[SodiumVersion]()", SODIUM_VERSION)
 }
