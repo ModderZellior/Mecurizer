@@ -2,7 +2,6 @@ package net.caffeinemc.mods.sodium.client;
 
 import net.caffeinemc.mods.sodium.client.compatibility.workarounds.Workarounds;
 import net.caffeinemc.mods.sodium.client.compatibility.workarounds.intel.IntelWorkarounds;
-import org.lwjgl.opengl.GL11C;
 
 public final class MercurizerRuntimePolicy {
     private static final float DEFAULT_UPLOAD_FRACTION = 0.04f;
@@ -22,15 +21,6 @@ public final class MercurizerRuntimePolicy {
         }
         if (Workarounds.isWorkaroundEnabled(Workarounds.Reference.AMD_GAME_OPTIMIZATION_BROKEN)) {
             return true;
-        }
-        // NVIDIA MX series and other low-end discrete GPUs share memory characteristics
-        // with integrated graphics — detect via renderer string
-        String renderer = GL11C.glGetString(GL11C.GL_RENDERER);
-        if (renderer != null) {
-            String r = renderer.toLowerCase();
-            if (r.contains("mx") && r.contains("nvidia")) {
-                return true;
-            }
         }
         return false;
     }
