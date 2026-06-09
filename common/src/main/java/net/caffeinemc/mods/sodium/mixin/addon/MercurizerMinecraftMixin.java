@@ -7,6 +7,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.util.profiling.Profiler;
 import net.minecraft.util.profiling.ProfilerFiller;
 import org.lwjgl.opengl.GL32C;
+import org.slf4j.LoggerFactory;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -45,7 +46,8 @@ public class MercurizerMinecraftMixin {
         var fence = GL32C.glFenceSync(GL32C.GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
 
         if (fence == 0) {
-            throw new RuntimeException("Failed to create fence object");
+            LoggerFactory.getLogger("Mercurizer").warn("Failed to create GL fence object, skipping frame sync");
+            return;
         }
 
         this.fences.enqueue(fence);
