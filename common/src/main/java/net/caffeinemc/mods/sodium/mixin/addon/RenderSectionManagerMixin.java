@@ -7,9 +7,7 @@ import net.caffeinemc.mods.sodium.client.render.chunk.compile.BuilderTaskOutput;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.ArrayList;
@@ -32,15 +30,5 @@ public class RenderSectionManagerMixin {
             original.subList(max, original.size()).clear();
         }
         return original;
-    }
-
-    @ModifyConstant(method = "updateChunks", constant = @Constant(floatValue = 0.1f, ordinal = 0))
-    private float modifyUploadFraction(float ignored) {
-        return MercurizerRuntimePolicy.getUploadFraction();
-    }
-
-    @ModifyConstant(method = "updateChunks", constant = @Constant(longValue = 2_000_000L, ordinal = 0))
-    private long modifyMinUploadBudget(long ignored) {
-        return 1_000_000L;
     }
 }
