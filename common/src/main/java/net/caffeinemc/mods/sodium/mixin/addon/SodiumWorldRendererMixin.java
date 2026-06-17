@@ -12,7 +12,7 @@ public class SodiumWorldRendererMixin {
     @ModifyArg(
             method = "initRenderer",
             at = @At(value = "INVOKE",
-                    target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/RenderSectionManager;<init>(Lnet/minecraft/client/multiplayer/ClientLevel;ILnet/caffeinemc/mods/sodium/client/render/chunk/translucent_sorting/SortBehavior;Lnet/caffeinemc/mods/sodium/client/gl/device/CommandList;)V"),
+                    target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/RenderSectionManager;<init>(Lnet/minecraft/client/multiplayer/ClientLevel;ILnet/caffeinemc/mods/sodium/client/render/chunk/translucent_sorting/SortBehavior;)V"),
             index = 2)
     private SortBehavior modifySortBehavior(SortBehavior original) {
         if (original == SortBehavior.OFF) {

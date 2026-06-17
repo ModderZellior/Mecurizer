@@ -31,7 +31,7 @@ dependencies {
     minecraft("com.mojang:minecraft:${BuildConfig.MINECRAFT_VERSION}")
     implementation("net.fabricmc:fabric-loader:${BuildConfig.FABRIC_LOADER_VERSION}")
 
-    val sodiumJar = rootProject.file("libs/sodium-fabric-0.8.12+mc${BuildConfig.MINECRAFT_VERSION}.jar")
+    val sodiumJar = rootProject.file("libs/sodium-fabric-0.9.0+mc${BuildConfig.MINECRAFT_VERSION}.jar")
     compileOnly(files(sodiumJar))
 }
 
