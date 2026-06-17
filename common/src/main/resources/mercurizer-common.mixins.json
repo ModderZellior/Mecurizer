@@ -12,7 +12,6 @@
     "addon.ResourcePackScannerMixin",
     "addon.SodiumConfigBuilderMixin",
     "addon.SodiumDebugEntryMixin",
-    "addon.SodiumWorldRendererMixin",
     "addon.VideoSettingsScreenMixin"
   ]
 }

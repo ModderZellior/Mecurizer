@@ -6,8 +6,8 @@ import net.caffeinemc.mods.sodium.client.compatibility.workarounds.intel.IntelWo
 public final class MercurizerRuntimePolicy {
     private static final float DEFAULT_UPLOAD_FRACTION = 0.04f;
     private static final float SAFE_UPLOAD_FRACTION = 0.025f;
-    private static final int DEFAULT_MAX_UPLOAD_RESULTS_PER_FRAME = 12;
-    private static final int SAFE_MAX_UPLOAD_RESULTS_PER_FRAME = 6;
+    private static final int DEFAULT_MAX_UPLOAD_RESULTS_PER_FRAME = 32;
+    private static final int SAFE_MAX_UPLOAD_RESULTS_PER_FRAME = 16;
 
     // Cached at class load time — hardware never changes at runtime
     private static final boolean SAFE_STAGING_PATH = computeSafeStagingPath();
