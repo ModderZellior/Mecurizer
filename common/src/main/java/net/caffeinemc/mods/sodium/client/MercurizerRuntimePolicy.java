@@ -4,7 +4,6 @@ import net.caffeinemc.mods.sodium.client.compatibility.workarounds.Workarounds;
 import net.caffeinemc.mods.sodium.client.compatibility.workarounds.intel.IntelWorkarounds;
 
 public final class MercurizerRuntimePolicy {
-    // Cached at class load time — hardware never changes at runtime
     private static final boolean SAFE_STAGING_PATH = computeSafeStagingPath();
 
     private MercurizerRuntimePolicy() {
@@ -45,9 +44,12 @@ public final class MercurizerRuntimePolicy {
     }
 
     public static boolean shouldAnimateVisibleTexturesThisFrame(long frameTimeNanos) {
-        if (!SAFE_STAGING_PATH) {
-            return true;
+        // Safe staging path (Intel Gen8 or broken AMD) always uses fixed 33 ms threshold.
+        if (SAFE_STAGING_PATH) {
+            return frameTimeNanos < 33_000_000L;
         }
-        return frameTimeNanos < 33_000_000L;
+        // All other hardware: use benchmark-derived threshold so slow CPUs shed
+        // texture animation work during long frames and free up time for chunk building.
+        return frameTimeNanos < MercurizerTuning.getTextureAnimThresholdNs();
     }
 }

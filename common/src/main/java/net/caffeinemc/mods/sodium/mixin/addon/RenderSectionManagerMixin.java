@@ -1,6 +1,7 @@
 package net.caffeinemc.mods.sodium.mixin.addon;
 
 import net.caffeinemc.mods.sodium.client.MercurizerRuntimePolicy;
+import net.caffeinemc.mods.sodium.client.MercurizerTuning;
 import net.caffeinemc.mods.sodium.client.render.chunk.RenderSectionManager;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -23,11 +24,6 @@ public class RenderSectionManagerMixin {
 
     @ModifyConstant(method = "updateChunks", constant = @Constant(floatValue = 0.1f, ordinal = 0))
     private float modifyUploadFraction(float ignored) {
-        return 0.06f;
-    }
-
-    @ModifyConstant(method = "updateChunks", constant = @Constant(longValue = 2_000_000L, ordinal = 0))
-    private long modifyMinUploadBudget(long ignored) {
-        return 1_000_000L;
+        return MercurizerTuning.getUploadFraction();
     }
 }
