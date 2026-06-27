@@ -18,8 +18,6 @@ public final class MercurizerBenchmark {
     private static final int SMALL_WARMUP = 5;
     private static final int SMALL_RUNS   = 10;
 
-    // 4 MB working set — exceeds typical L2 cache to measure memory bandwidth,
-    // which dominates real chunk mesh building.
     private static final int CPU_ARRAY_SIZE = 1024 * 1024;
     private static final int CPU_WARMUP     = 5;
     private static final int CPU_RUNS       = 10;
