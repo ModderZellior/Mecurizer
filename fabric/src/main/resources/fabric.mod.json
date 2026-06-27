@@ -32,7 +32,7 @@
   ],
   "depends" : {
     "fabricloader" : ">=0.16.0",
-    "sodium" : "0.8.12+mc1.21.11"
+    "sodium" : "0.8.13-beta.2+mc1.21.11"
   },
   "breaks" : {
     "embeddium": "*",
