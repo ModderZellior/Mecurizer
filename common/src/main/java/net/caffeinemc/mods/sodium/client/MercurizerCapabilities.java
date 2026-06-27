@@ -1,5 +1,6 @@
 package net.caffeinemc.mods.sodium.client;
 
+import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
@@ -19,6 +20,7 @@ public final class MercurizerCapabilities {
 
     private static volatile MercurizerCapabilities cached;
 
+    public final boolean isVulkan;
     public final int totalVramMb;
     public final int freeVramMb;
     public final int maxUniformBlockSize;
@@ -49,6 +51,7 @@ public final class MercurizerCapabilities {
     public final String version;
 
     private MercurizerCapabilities(
+            boolean isVulkan,
             int totalVramMb, int freeVramMb,
             int maxUniformBlockSize, int maxVertexAttribs, int maxVertexUniformBlocks,
             boolean hasDirectStateAccess, boolean hasMultiDrawIndirect, boolean hasBufferStorage,
@@ -58,6 +61,7 @@ public final class MercurizerCapabilities {
             int maxComputeWorkGroupSizeX, boolean hasShaderStorageBufferObject, int maxFragmentUniformComponents,
             boolean hasSyncObjects, boolean hasTimerQuery,
             String renderer, String vendor, String version) {
+        this.isVulkan = isVulkan;
         this.totalVramMb = totalVramMb;
         this.freeVramMb = freeVramMb;
         this.maxUniformBlockSize = maxUniformBlockSize;
@@ -92,9 +96,32 @@ public final class MercurizerCapabilities {
         if (cached != null) return cached;
         synchronized (MercurizerCapabilities.class) {
             if (cached != null) return cached;
-            cached = probe();
+            cached = isOpenGLContextAvailable() ? probe() : probeVulkan();
         }
         return cached;
+    }
+
+    private static boolean isOpenGLContextAvailable() {
+        try {
+            GL.getCapabilities();
+            return true;
+        } catch (IllegalStateException e) {
+            return false;
+        }
+    }
+
+    private static MercurizerCapabilities probeVulkan() {
+        return new MercurizerCapabilities(
+                true,
+                -1, -1,
+                0, 0, 0,
+                false, false, false,
+                0, 0, 0,
+                false, false, 0f,
+                false, false,
+                0, false, 0,
+                false, false,
+                "Vulkan", "Unknown", "Vulkan");
     }
 
     private static MercurizerCapabilities probe() {
@@ -144,6 +171,7 @@ public final class MercurizerCapabilities {
         String version = GL11.glGetString(GL11.GL_VERSION);
 
         return new MercurizerCapabilities(
+                false,
                 totalVram, freeVram,
                 maxUniformBlockSize, maxVertexAttribs, maxVertexUniformBlocks,
                 hasDirectStateAccess, hasMultiDrawIndirect, hasBufferStorage,

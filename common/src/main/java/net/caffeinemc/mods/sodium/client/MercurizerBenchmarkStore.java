@@ -17,6 +17,9 @@ public final class MercurizerBenchmarkStore {
         MercurizerBenchmarkResult stored = load(gameDirectory);
         if (stored == null) return true;
         if (stored.cpuThroughputMOpsPerSec <= 0) return true;
+        if (caps.isVulkan) {
+            return !"Vulkan".equals(stored.rendererAtBenchmarkTime);
+        }
         return !caps.renderer.equals(stored.rendererAtBenchmarkTime) ||
                !caps.version.equals(stored.driverVersionAtBenchmarkTime);
     }

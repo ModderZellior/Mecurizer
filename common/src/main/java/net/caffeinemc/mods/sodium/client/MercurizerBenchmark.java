@@ -23,6 +23,27 @@ public final class MercurizerBenchmark {
     private static final int CPU_RUNS       = 10;
 
     public static MercurizerBenchmarkResult run(MercurizerCapabilities caps) {
+        if (caps.isVulkan) {
+            return runCpuOnly(caps);
+        }
+        return runFull(caps);
+    }
+
+    private static MercurizerBenchmarkResult runCpuOnly(MercurizerCapabilities caps) {
+        LOGGER.info("[Mercurizer] Vulkan backend detected — running CPU benchmark only");
+        double cpuMOps = runCpuBenchmark();
+        int cores = Runtime.getRuntime().availableProcessors();
+        LOGGER.info("[Mercurizer]   CPU result: {} MOps/s x {} cores", String.format("%.0f", cpuMOps), cores);
+        LOGGER.info("[Mercurizer] Benchmark complete — CPU: {} MOps/s x {} cores (Vulkan, no GPU benchmark)",
+                String.format("%.0f", cpuMOps), cores);
+        return new MercurizerBenchmarkResult(
+                -1, -1,
+                cpuMOps, cores,
+                "Vulkan", "Vulkan",
+                System.currentTimeMillis());
+    }
+
+    private static MercurizerBenchmarkResult runFull(MercurizerCapabilities caps) {
         LOGGER.info("[Mercurizer] Starting GPU + CPU benchmark...");
         LOGGER.info("[Mercurizer]   GPU: {}", caps.renderer);
         LOGGER.info("[Mercurizer]   Driver: {}", caps.version);
@@ -94,8 +115,7 @@ public final class MercurizerBenchmark {
                 (CPU_ARRAY_SIZE * 4) / (1024 * 1024), CPU_RUNS);
         double cpuMOps = runCpuBenchmark();
         int cores = Runtime.getRuntime().availableProcessors();
-        LOGGER.info("[Mercurizer]   CPU result: {} MOps/s x {} cores",
-                String.format("%.0f", cpuMOps), cores);
+        LOGGER.info("[Mercurizer]   CPU result: {} MOps/s x {} cores", String.format("%.0f", cpuMOps), cores);
 
         LOGGER.info("[Mercurizer] Benchmark complete — GPU: {}/{} MB/s  CPU: {} MOps/s x {} cores",
                 String.format("%.0f", largeBandwidth),
@@ -122,7 +142,7 @@ public final class MercurizerBenchmark {
         for (int r = 0; r < CPU_RUNS; r++) totalOps += processCpuData(blocks, vertices);
         long elapsed = System.nanoTime() - t0;
 
-        return (totalOps * 1_000.0) / elapsed; // MOps/s
+        return (totalOps * 1_000.0) / elapsed;
     }
 
     private static long processCpuData(int[] blocks, int[] vertices) {

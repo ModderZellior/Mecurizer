@@ -19,7 +19,8 @@ public final class MercurizerTuning {
     public static void apply(MercurizerBenchmarkResult result) {
         lastResult = result;
 
-        double gpuBw   = Math.max(result.bufferUploadBandwidthMBps, 50.0);
+        boolean vulkan = result.bufferUploadBandwidthMBps <= 0;
+        double gpuBw   = vulkan ? 500.0 : Math.max(result.bufferUploadBandwidthMBps, 50.0);
         double cpuMOps = Math.max(result.cpuThroughputMOpsPerSec, 50.0);
 
         double cpuNorm = Math.max(0.5, Math.min(1.75, cpuMOps / 800.0));
@@ -47,9 +48,9 @@ public final class MercurizerTuning {
         LOGGER.info("[Mercurizer]   Min upload budget: Sodium default {} ms -> Mercurizer {} ms",
                 String.format("%.1f", SODIUM_DEFAULT_MIN_BUDGET_NS / 1_000_000.0),
                 String.format("%.3f", minUploadBudgetNs / 1_000_000.0));
-        LOGGER.info("[Mercurizer]   Texture anim throttle: {}  (GPU: {} MB/s, CPU: {} MOps/s)",
+        LOGGER.info("[Mercurizer]   Texture anim throttle: {}  (backend: {}, CPU: {} MOps/s)",
                 texThrottleDesc,
-                String.format("%.0f", result.bufferUploadBandwidthMBps),
+                vulkan ? "Vulkan" : String.format("%.0f MB/s GPU", result.bufferUploadBandwidthMBps),
                 String.format("%.0f", result.cpuThroughputMOpsPerSec));
     }
 
