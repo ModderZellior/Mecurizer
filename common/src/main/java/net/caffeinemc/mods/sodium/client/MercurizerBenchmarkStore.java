@@ -16,7 +16,6 @@ public final class MercurizerBenchmarkStore {
     public static boolean needsBenchmark(MercurizerCapabilities caps, File gameDirectory) {
         MercurizerBenchmarkResult stored = load(gameDirectory);
         if (stored == null) return true;
-        // Force re-benchmark if CPU data is missing (old benchmark.json from before CPU support)
         if (stored.cpuThroughputMOpsPerSec <= 0) return true;
         return !caps.renderer.equals(stored.rendererAtBenchmarkTime) ||
                !caps.version.equals(stored.driverVersionAtBenchmarkTime);
