@@ -36,3 +36,6 @@ frapi/run/
 
 # Kotlin compiler working directory
 .kotlin
+
+*.log
+*.log.err
