@@ -26,4 +26,9 @@ public class RenderSectionManagerMixin {
     private float modifyUploadFraction(float ignored) {
         return MercurizerTuning.getUploadFraction();
     }
+
+    @ModifyConstant(method = "updateChunks", constant = @Constant(longValue = 2_000_000L, ordinal = 0))
+    private long modifyMinUploadBudget(long ignored) {
+        return MercurizerTuning.getMinUploadBudgetNs();
+    }
 }
