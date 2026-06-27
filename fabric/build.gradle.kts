@@ -31,7 +31,7 @@ dependencies {
     minecraft("com.mojang:minecraft:${BuildConfig.MINECRAFT_VERSION}")
     implementation("net.fabricmc:fabric-loader:${BuildConfig.FABRIC_LOADER_VERSION}")
 
-    compileOnly(files(rootProject.file("libs/sodium-fabric-0.8.9+mc26.1.jar")))
+    compileOnly(files(rootProject.file("libs/sodium-fabric-0.8.9+mc26.1.1.jar")))
 }
 
 loom {

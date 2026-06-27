@@ -22,7 +22,7 @@ dependencies {
     compileOnly("net.fabricmc:sponge-mixin:0.13.2+mixin.0.8.5")
     compileOnly("net.fabricmc:fabric-loader:${BuildConfig.FABRIC_LOADER_VERSION}")
 
-    compileOnly(files(rootProject.file("libs/sodium-fabric-0.8.9+mc26.1.jar")))
+    compileOnly(files(rootProject.file("libs/sodium-fabric-0.8.9+mc26.1.1.jar")))
 }
 
 loom {
