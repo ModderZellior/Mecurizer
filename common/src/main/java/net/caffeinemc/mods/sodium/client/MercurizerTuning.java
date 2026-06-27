@@ -53,8 +53,8 @@ public final class MercurizerTuning {
                 String.format("%.0f", result.cpuThroughputMOpsPerSec));
     }
 
-    public static float getUploadFraction()                  { return uploadFraction; }
-    public static long  getMinUploadBudgetNs()               { return minUploadBudgetNs; }
+    public static float getUploadFraction()                  { return MercurizerFrameTracker.getDynamicUploadFraction(uploadFraction); }
+    public static long  getMinUploadBudgetNs()               { return MercurizerFrameTracker.getDynamicMinBudgetNs(minUploadBudgetNs); }
     public static long  getTextureAnimThresholdNs()          { return textureAnimThresholdNs; }
     public static MercurizerBenchmarkResult getLastResult()  { return lastResult; }
 }

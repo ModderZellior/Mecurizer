@@ -1,5 +1,6 @@
 package net.caffeinemc.mods.sodium.mixin.addon;
 
+import net.caffeinemc.mods.sodium.client.MercurizerFrameTracker;
 import net.caffeinemc.mods.sodium.client.MercurizerRuntimePolicy;
 import net.caffeinemc.mods.sodium.client.MercurizerTuning;
 import net.caffeinemc.mods.sodium.client.render.chunk.RenderSectionManager;
@@ -14,6 +15,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(RenderSectionManager.class)
 public class RenderSectionManagerMixin {
     @Shadow private long lastFrameDuration;
+
+    @Inject(method = "updateChunks", at = @At("HEAD"))
+    private void recordFrameTime(CallbackInfo ci) {
+        MercurizerFrameTracker.record(this.lastFrameDuration);
+    }
 
     @Inject(method = "tickVisibleRenders", at = @At("HEAD"), cancellable = true)
     private void limitTextureAnimation(CallbackInfo ci) {
