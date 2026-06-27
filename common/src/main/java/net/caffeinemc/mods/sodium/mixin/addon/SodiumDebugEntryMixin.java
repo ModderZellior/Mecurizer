@@ -33,7 +33,7 @@ public class SodiumDebugEntryMixin {
         if (result != null) {
             displayer.addToGroup(group, String.format("GPU upload: %.0f MB/s (large) / %.0f MB/s (small)",
                     result.bufferUploadBandwidthMBps, result.smallBufferUploadBandwidthMBps));
-            displayer.addToGroup(group, String.format("CPU: %.0f MOps/s × %d cores",
+            displayer.addToGroup(group, String.format("CPU: %.0f MOps/s x %d cores",
                     result.cpuThroughputMOpsPerSec, result.availableProcessors));
         }
         displayer.addToGroup(group, String.format("Upload budget: %.0f%% frame / min %.2f ms",
