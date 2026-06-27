@@ -19,7 +19,6 @@ public final class MercurizerCapabilities {
 
     private static volatile MercurizerCapabilities cached;
 
-    // Memory & Buffer
     public final int totalVramMb;
     public final int freeVramMb;
     public final int maxUniformBlockSize;
@@ -29,7 +28,6 @@ public final class MercurizerCapabilities {
     public final boolean hasMultiDrawIndirect;
     public final boolean hasBufferStorage;
 
-    // Texture
     public final int maxTextureSize;
     public final int maxTextureImageUnits;
     public final int maxArrayTextureLayers;
@@ -39,16 +37,13 @@ public final class MercurizerCapabilities {
     public final boolean hasS3tcCompression;
     public final boolean hasRgtcCompression;
 
-    // Shader & Compute
     public final int maxComputeWorkGroupSizeX;
     public final boolean hasShaderStorageBufferObject;
     public final int maxFragmentUniformComponents;
 
-    // Sync & Timing
     public final boolean hasSyncObjects;
     public final boolean hasTimerQuery;
 
-    // Driver
     public final String renderer;
     public final String vendor;
     public final String version;

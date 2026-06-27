@@ -44,12 +44,9 @@ public final class MercurizerRuntimePolicy {
     }
 
     public static boolean shouldAnimateVisibleTexturesThisFrame(long frameTimeNanos) {
-        // Safe staging path (Intel Gen8 or broken AMD) always uses fixed 33 ms threshold.
         if (SAFE_STAGING_PATH) {
             return frameTimeNanos < 33_000_000L;
         }
-        // All other hardware: use benchmark-derived threshold so slow CPUs shed
-        // texture animation work during long frames and free up time for chunk building.
         return frameTimeNanos < MercurizerTuning.getTextureAnimThresholdNs();
     }
 }
