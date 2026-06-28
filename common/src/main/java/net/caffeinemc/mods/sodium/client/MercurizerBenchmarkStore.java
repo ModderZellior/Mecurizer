@@ -17,9 +17,6 @@ public final class MercurizerBenchmarkStore {
         MercurizerBenchmarkResult stored = load(gameDirectory);
         if (stored == null) return true;
         if (stored.cpuThroughputMOpsPerSec <= 0) return true;
-        if (caps.isVulkan) {
-            return !"Vulkan".equals(stored.rendererAtBenchmarkTime);
-        }
         return !caps.renderer.equals(stored.rendererAtBenchmarkTime) ||
                !caps.version.equals(stored.driverVersionAtBenchmarkTime);
     }
@@ -44,6 +41,7 @@ public final class MercurizerBenchmarkStore {
         try (Reader reader = new FileReader(file)) {
             return GSON.fromJson(reader, MercurizerBenchmarkResult.class);
         } catch (Exception e) {
+            LOGGER.warn("[Mercurizer] Could not read benchmark.json — will re-run benchmark: {}", e.getMessage());
             return null;
         }
     }

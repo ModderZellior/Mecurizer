@@ -40,7 +40,7 @@ public final class MercurizerBenchmark {
                 -1, -1,
                 cpuMOps, cores,
                 "Vulkan", "Vulkan",
-                System.currentTimeMillis());
+                System.currentTimeMillis(), false);
     }
 
     private static MercurizerBenchmarkResult runFull(MercurizerCapabilities caps) {
@@ -127,7 +127,7 @@ public final class MercurizerBenchmark {
                 largeBandwidth, smallBandwidth,
                 cpuMOps, cores,
                 caps.renderer, caps.version,
-                System.currentTimeMillis());
+                System.currentTimeMillis(), false);
     }
 
     private static double runCpuBenchmark() {

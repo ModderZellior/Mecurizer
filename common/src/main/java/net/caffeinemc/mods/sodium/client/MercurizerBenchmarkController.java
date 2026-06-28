@@ -18,27 +18,17 @@ public final class MercurizerBenchmarkController {
         if (!MercurizerBenchmarkStore.needsBenchmark(caps, mc.gameDirectory)) {
             MercurizerBenchmarkResult stored = MercurizerBenchmarkStore.load(mc.gameDirectory);
             if (stored != null) {
-                if (caps.isVulkan) {
-                    LOGGER.info("[Mercurizer] Loaded stored benchmark results — CPU: {} MOps/s x {} cores (Vulkan)",
-                            String.format("%.0f", stored.cpuThroughputMOpsPerSec),
-                            stored.availableProcessors);
-                } else {
-                    LOGGER.info("[Mercurizer] Loaded stored benchmark results — GPU: {}/{} MB/s  CPU: {} MOps/s x {} cores",
-                            String.format("%.0f", stored.bufferUploadBandwidthMBps),
-                            String.format("%.0f", stored.smallBufferUploadBandwidthMBps),
-                            String.format("%.0f", stored.cpuThroughputMOpsPerSec),
-                            stored.availableProcessors);
-                }
+                LOGGER.info("[Mercurizer] Loaded stored benchmark results — GPU: {}/{} MB/s  CPU: {} MOps/s x {} cores",
+                        String.format("%.0f", stored.bufferUploadBandwidthMBps),
+                        String.format("%.0f", stored.smallBufferUploadBandwidthMBps),
+                        String.format("%.0f", stored.cpuThroughputMOpsPerSec),
+                        stored.availableProcessors);
                 MercurizerTuning.apply(stored);
             }
             doneThisSession = true;
             return false;
         }
-        if (caps.isVulkan) {
-            LOGGER.info("[Mercurizer] No valid stored benchmark found — will run CPU benchmark now (Vulkan backend)");
-        } else {
-            LOGGER.info("[Mercurizer] No valid stored benchmark found — will run benchmark now (GPU: {})", caps.renderer);
-        }
+        LOGGER.info("[Mercurizer] No valid stored benchmark found — will run benchmark now (GPU: {})", caps.renderer);
         return true;
     }
 
@@ -48,6 +38,7 @@ public final class MercurizerBenchmarkController {
 
     public static void resetForRebenchmark() {
         doneThisSession = false;
+        MercurizerCapabilities.clearCache();
         File f = new File(new File(Minecraft.getInstance().gameDirectory, "mercurizer"), "benchmark.json");
         f.delete();
     }

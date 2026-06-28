@@ -7,7 +7,7 @@ object BuildConfig {
     val FABRIC_API_VERSION: String = "0.152.1+26.2"
     val SUPPORT_FRAPI : Boolean = true
 
-    val MOD_VERSION: String = "1.2"
+    val MOD_VERSION: String = "1.3"
 
     val RELEASE_TAG: String = "mc$MINECRAFT_VERSION-$MOD_VERSION"
 

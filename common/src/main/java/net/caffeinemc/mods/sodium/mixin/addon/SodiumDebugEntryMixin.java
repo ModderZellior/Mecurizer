@@ -35,6 +35,7 @@ public class SodiumDebugEntryMixin {
                     result.bufferUploadBandwidthMBps, result.smallBufferUploadBandwidthMBps));
             displayer.addToGroup(group, String.format("CPU: %.0f MOps/s x %d cores",
                     result.cpuThroughputMOpsPerSec, result.availableProcessors));
+            displayer.addToGroup(group, "Benchmark: " + (result.isRefined ? "Refined" : "Synthetic"));
         }
         displayer.addToGroup(group, String.format("Upload budget: %.0f%% frame / min %.2f ms",
                 MercurizerTuning.getUploadFraction() * 100,
