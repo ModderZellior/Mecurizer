@@ -19,6 +19,7 @@ public class RenderSectionManagerMixin {
     @Inject(method = "updateChunks", at = @At("HEAD"))
     private void recordFrameTime(CallbackInfo ci) {
         MercurizerFrameTracker.record(this.lastFrameDuration);
+        MercurizerTuning.checkRefinement();
     }
 
     @Inject(method = "tickVisibleRenders", at = @At("HEAD"), cancellable = true)

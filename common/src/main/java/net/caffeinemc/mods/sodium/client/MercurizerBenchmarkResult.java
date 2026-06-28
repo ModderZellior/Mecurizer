@@ -8,6 +8,7 @@ public final class MercurizerBenchmarkResult {
     public final String rendererAtBenchmarkTime;
     public final String driverVersionAtBenchmarkTime;
     public final long benchmarkTimestamp;
+    public final boolean isRefined;
 
     public MercurizerBenchmarkResult(
             double bufferUploadBandwidthMBps,
@@ -16,7 +17,8 @@ public final class MercurizerBenchmarkResult {
             int availableProcessors,
             String rendererAtBenchmarkTime,
             String driverVersionAtBenchmarkTime,
-            long benchmarkTimestamp) {
+            long benchmarkTimestamp,
+            boolean isRefined) {
         this.bufferUploadBandwidthMBps = bufferUploadBandwidthMBps;
         this.smallBufferUploadBandwidthMBps = smallBufferUploadBandwidthMBps;
         this.cpuThroughputMOpsPerSec = cpuThroughputMOpsPerSec;
@@ -24,5 +26,6 @@ public final class MercurizerBenchmarkResult {
         this.rendererAtBenchmarkTime = rendererAtBenchmarkTime;
         this.driverVersionAtBenchmarkTime = driverVersionAtBenchmarkTime;
         this.benchmarkTimestamp = benchmarkTimestamp;
+        this.isRefined = isRefined;
     }
 }
