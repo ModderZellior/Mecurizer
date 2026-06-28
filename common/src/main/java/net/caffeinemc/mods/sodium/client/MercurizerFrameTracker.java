@@ -16,6 +16,9 @@ public final class MercurizerFrameTracker {
     private static double  stableBudgetSum    = 0;
     private static long    stableSamples      = 0;
 
+    private static float currentFraction = -1;
+    private static long  currentBudget   = -1;
+
     private MercurizerFrameTracker() {}
 
     public static void record(long frameNs) {
@@ -88,33 +91,42 @@ public final class MercurizerFrameTracker {
         return bestFrameNs == Long.MAX_VALUE ? 16_666_667L : bestFrameNs;
     }
 
-    private static float lastDynamicFraction = 0;
-
     public static float getDynamicUploadFraction(float base) {
+        if (currentFraction < 0) currentFraction = base;
         long avg = smoothed();
         long tgt = target();
-        float result;
+        float ideal;
         if (avg <= tgt) {
-            result = base;
+            ideal = base;
         } else {
             double pressure = (double) avg / tgt;
-            result = (float) (base * Math.max(0.3, 1.0 - (pressure - 1.0) * 0.5));
+            ideal = (float) (base * Math.max(0.3, 1.0 - (pressure - 1.0) * 0.5));
         }
-        lastDynamicFraction = result;
-        return result;
+        if (ideal < currentFraction) {
+            currentFraction += (ideal - currentFraction) * 0.3f;
+        } else {
+            currentFraction += (ideal - currentFraction) * 0.02f;
+        }
+        return currentFraction;
     }
 
     public static long getDynamicMinBudgetNs(long base) {
+        if (currentBudget < 0) currentBudget = base;
         long avg = smoothed();
         long tgt = target();
-        long result;
+        long ideal;
         if (avg <= tgt) {
-            result = base;
+            ideal = base;
         } else {
             double pressure = (double) avg / tgt;
-            result = (long) (base * Math.max(0.25, 1.0 - (pressure - 1.0) * 0.6));
+            ideal = (long) (base * Math.max(0.25, 1.0 - (pressure - 1.0) * 0.6));
         }
-        accumulateDynamicValues(lastDynamicFraction, result);
-        return result;
+        if (ideal < currentBudget) {
+            currentBudget += (long) ((ideal - currentBudget) * 0.3);
+        } else {
+            currentBudget += (long) ((ideal - currentBudget) * 0.02);
+        }
+        accumulateDynamicValues(currentFraction, currentBudget);
+        return currentBudget;
     }
 }
