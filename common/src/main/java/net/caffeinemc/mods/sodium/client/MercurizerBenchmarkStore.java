@@ -41,6 +41,7 @@ public final class MercurizerBenchmarkStore {
         try (Reader reader = new FileReader(file)) {
             return GSON.fromJson(reader, MercurizerBenchmarkResult.class);
         } catch (Exception e) {
+            LOGGER.warn("[Mercurizer] Could not read benchmark.json — will re-run benchmark: {}", e.getMessage());
             return null;
         }
     }
