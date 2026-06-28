@@ -88,6 +88,10 @@ public final class MercurizerCapabilities {
         return cached;
     }
 
+    public static void clearCache() {
+        cached = null;
+    }
+
     public static MercurizerCapabilities probeAndCache() {
         if (cached != null) return cached;
         synchronized (MercurizerCapabilities.class) {

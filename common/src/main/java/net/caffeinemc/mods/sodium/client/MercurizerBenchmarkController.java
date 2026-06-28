@@ -38,6 +38,7 @@ public final class MercurizerBenchmarkController {
 
     public static void resetForRebenchmark() {
         doneThisSession = false;
+        MercurizerCapabilities.clearCache();
         File f = new File(new File(Minecraft.getInstance().gameDirectory, "mercurizer"), "benchmark.json");
         f.delete();
     }
