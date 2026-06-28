@@ -10,7 +10,7 @@ object BuildConfig {
 
     val PARCHMENT_VERSION: String? = null
 
-    val MOD_VERSION: String = "1.2"
+    val MOD_VERSION: String = "1.3"
 
     val RELEASE_TAG: String = "mc$MINECRAFT_VERSION-$MOD_VERSION"
 

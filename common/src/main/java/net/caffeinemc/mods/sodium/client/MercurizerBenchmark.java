@@ -107,7 +107,7 @@ public final class MercurizerBenchmark {
                 largeBandwidth, smallBandwidth,
                 cpuMOps, cores,
                 caps.renderer, caps.version,
-                System.currentTimeMillis());
+                System.currentTimeMillis(), false);
     }
 
     private static double runCpuBenchmark() {
