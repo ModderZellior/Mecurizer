@@ -20,7 +20,6 @@ public final class MercurizerCapabilities {
 
     private static volatile MercurizerCapabilities cached;
 
-    public final boolean isVulkan;
     public final int totalVramMb;
     public final int freeVramMb;
     public final int maxUniformBlockSize;
@@ -51,7 +50,6 @@ public final class MercurizerCapabilities {
     public final String version;
 
     private MercurizerCapabilities(
-            boolean isVulkan,
             int totalVramMb, int freeVramMb,
             int maxUniformBlockSize, int maxVertexAttribs, int maxVertexUniformBlocks,
             boolean hasDirectStateAccess, boolean hasMultiDrawIndirect, boolean hasBufferStorage,
@@ -61,7 +59,6 @@ public final class MercurizerCapabilities {
             int maxComputeWorkGroupSizeX, boolean hasShaderStorageBufferObject, int maxFragmentUniformComponents,
             boolean hasSyncObjects, boolean hasTimerQuery,
             String renderer, String vendor, String version) {
-        this.isVulkan = isVulkan;
         this.totalVramMb = totalVramMb;
         this.freeVramMb = freeVramMb;
         this.maxUniformBlockSize = maxUniformBlockSize;
@@ -94,36 +91,38 @@ public final class MercurizerCapabilities {
 
     public static void clearCache() { cached = null; }
 
+    public boolean isIntegratedGpu() {
+        String r = renderer.toLowerCase();
+        String v = vendor.toLowerCase();
+        if (r.contains("intel") || v.contains("intel")) return true;
+        if (r.contains("llvmpipe") || r.contains("softpipe") || r.contains("virgl")) return true;
+        if ((r.contains("radeon") || r.contains("amd")) && r.contains("vega")) {
+            if (r.contains("rx vega")) return false;
+            return true;
+        }
+        if (v.contains("apple")) return true;
+        return false;
+    }
+
+    public static String getOsPlatform() {
+        String os = System.getProperty("os.name", "").toLowerCase();
+        if (os.contains("win")) return "windows";
+        if (os.contains("mac") || os.contains("darwin")) return "mac";
+        return "linux";
+    }
+
     public static MercurizerCapabilities probeAndCache() {
         if (cached != null) return cached;
         synchronized (MercurizerCapabilities.class) {
             if (cached != null) return cached;
-            cached = isOpenGLContextAvailable() ? probe() : probeVulkan();
+            try {
+                GL.getCapabilities();
+            } catch (IllegalStateException e) {
+                return null;
+            }
+            cached = probe();
         }
         return cached;
-    }
-
-    private static boolean isOpenGLContextAvailable() {
-        try {
-            GL.getCapabilities();
-            return true;
-        } catch (IllegalStateException e) {
-            return false;
-        }
-    }
-
-    private static MercurizerCapabilities probeVulkan() {
-        return new MercurizerCapabilities(
-                true,
-                -1, -1,
-                0, 0, 0,
-                false, false, false,
-                0, 0, 0,
-                false, false, 0f,
-                false, false,
-                0, false, 0,
-                false, false,
-                "Vulkan", "Unknown", "Vulkan");
     }
 
     private static MercurizerCapabilities probe() {
@@ -173,7 +172,6 @@ public final class MercurizerCapabilities {
         String version = GL11.glGetString(GL11.GL_VERSION);
 
         return new MercurizerCapabilities(
-                false,
                 totalVram, freeVram,
                 maxUniformBlockSize, maxVertexAttribs, maxVertexUniformBlocks,
                 hasDirectStateAccess, hasMultiDrawIndirect, hasBufferStorage,

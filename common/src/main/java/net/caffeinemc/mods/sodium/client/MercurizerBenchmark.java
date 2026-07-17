@@ -7,142 +7,137 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
+/** Offline (non-screen) benchmark runner. Used for headless / test paths. */
 public final class MercurizerBenchmark {
     private static final Logger LOGGER = LoggerFactory.getLogger("Mercurizer");
 
     private static final int LARGE_SIZE   = 4 * 1024 * 1024;
-    private static final int SMALL_SIZE   = 256 * 1024;
-    private static final int LARGE_WARMUP = 3;
-    private static final int LARGE_RUNS   = 5;
-    private static final int SMALL_WARMUP = 5;
-    private static final int SMALL_RUNS   = 10;
-
+    private static final int SMALL_SIZE   = 1 * 1024 * 1024;
+    private static final int LARGE_WARMUP = 12;
+    private static final int LARGE_RUNS   = 30;
+    private static final int SMALL_WARMUP = 12;
+    private static final int SMALL_RUNS   = 30;
+    private static final int LATENCY_RUNS = 20;
     private static final int CPU_ARRAY_SIZE = 1024 * 1024;
-    private static final int CPU_WARMUP     = 5;
-    private static final int CPU_RUNS       = 10;
+    private static final int CPU_WARMUP     = 10;
+    private static final int CPU_RUNS       = 25;
+    private static final double TRIM        = 0.15;
+    private static final double SPIKE_FACTOR = 3.0;
+    private static final double COV_LOW_CONFIDENCE = 0.20;
 
     public static MercurizerBenchmarkResult run(MercurizerCapabilities caps) {
-        if (caps.isVulkan) {
-            return runCpuOnly(caps);
-        }
+        if (caps == null) return runCpuOnly();
         return runFull(caps);
     }
 
-    private static MercurizerBenchmarkResult runCpuOnly(MercurizerCapabilities caps) {
-        LOGGER.info("[Mercurizer] Vulkan backend detected — running CPU benchmark only");
-        double cpuMOps = runCpuBenchmark();
+    private static MercurizerBenchmarkResult runCpuOnly() {
+        LOGGER.info("[Mercurizer] Vulkan backend — running CPU benchmark only");
+        double[] cpuResult = runCpuBenchmark();
+        double cpuMOps = cpuResult[0];
+        double cpuCov  = cpuResult[1];
         int cores = Runtime.getRuntime().availableProcessors();
-        LOGGER.info("[Mercurizer]   CPU result: {} MOps/s x {} cores", String.format("%.0f", cpuMOps), cores);
-        LOGGER.info("[Mercurizer] Benchmark complete — CPU: {} MOps/s x {} cores (Vulkan, no GPU benchmark)",
-                String.format("%.0f", cpuMOps), cores);
+        boolean lowConf = cpuCov > COV_LOW_CONFIDENCE;
+        LOGGER.info("[Mercurizer]   CPU: {} MOps/s x {} cores (CoV {}){}",
+                String.format("%.0f", cpuMOps), cores,
+                String.format("%.0f%%", cpuCov * 100),
+                lowConf ? " [LOW CONFIDENCE]" : "");
         return new MercurizerBenchmarkResult(
-                -1, -1,
-                cpuMOps, cores,
+                -1, -1, cpuMOps, cores,
                 "Vulkan", "Vulkan",
-                System.currentTimeMillis(), false);
+                System.currentTimeMillis(), false,
+                0, cpuCov, lowConf, 0, 0);
     }
 
     private static MercurizerBenchmarkResult runFull(MercurizerCapabilities caps) {
         LOGGER.info("[Mercurizer] Starting GPU + CPU benchmark...");
-        LOGGER.info("[Mercurizer]   GPU: {}", caps.renderer);
-        LOGGER.info("[Mercurizer]   Driver: {}", caps.version);
-
         int savedBinding = GL11.glGetInteger(GL15.GL_ARRAY_BUFFER_BINDING);
-
         ByteBuffer largeBuf = MemoryUtil.memAlloc(LARGE_SIZE);
         ByteBuffer smallBuf = MemoryUtil.memAlloc(SMALL_SIZE);
-        fillBuffer(largeBuf);
-        fillBuffer(smallBuf);
-
+        fillBuffer(largeBuf); fillBuffer(smallBuf);
         int largeVbo = GL15.glGenBuffers();
         int smallVbo = GL15.glGenBuffers();
 
-        double largeBandwidth;
-        double smallBandwidth;
-
+        double largeBw, smallBw, largeCov, smallCov, roundTripNs;
         try {
-            LOGGER.info("[Mercurizer]   Running GPU large-buffer benchmark ({} MB x {} runs)...",
-                    LARGE_SIZE / (1024 * 1024), LARGE_RUNS);
             GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, largeVbo);
-            for (int i = 0; i < LARGE_WARMUP; i++) {
-                largeBuf.rewind();
-                GL15.glBufferData(GL15.GL_ARRAY_BUFFER, largeBuf, GL15.GL_STREAM_DRAW);
-            }
+            for (int i = 0; i < LARGE_WARMUP; i++) { largeBuf.rewind(); GL15.glBufferData(GL15.GL_ARRAY_BUFFER, largeBuf, GL15.GL_STREAM_DRAW); }
             GL11.glFinish();
-
-            long t0 = System.nanoTime();
+            long[] largeSamples = new long[LARGE_RUNS];
             for (int i = 0; i < LARGE_RUNS; i++) {
                 largeBuf.rewind();
+                long t = System.nanoTime();
                 GL15.glBufferData(GL15.GL_ARRAY_BUFFER, largeBuf, GL15.GL_STREAM_DRAW);
+                GL11.glFinish();
+                largeSamples[i] = System.nanoTime() - t;
             }
-            GL11.glFinish();
-            long largeDurationNs = System.nanoTime() - t0;
+            largeBw  = bandwidthFromSamples(largeSamples, LARGE_SIZE);
+            largeCov = coefficientOfVariation(largeSamples);
 
-            largeBandwidth = (LARGE_SIZE * (double) LARGE_RUNS * 1_000_000_000.0)
-                    / (largeDurationNs * 1024.0 * 1024.0);
-            LOGGER.info("[Mercurizer]   Large buffer result: {} MB/s", String.format("%.0f", largeBandwidth));
-
-            LOGGER.info("[Mercurizer]   Running GPU small-buffer benchmark ({} KB x {} runs)...",
-                    SMALL_SIZE / 1024, SMALL_RUNS);
             GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, smallVbo);
-            for (int i = 0; i < SMALL_WARMUP; i++) {
-                smallBuf.rewind();
-                GL15.glBufferData(GL15.GL_ARRAY_BUFFER, smallBuf, GL15.GL_STREAM_DRAW);
-            }
+            for (int i = 0; i < SMALL_WARMUP; i++) { smallBuf.rewind(); GL15.glBufferData(GL15.GL_ARRAY_BUFFER, smallBuf, GL15.GL_STREAM_DRAW); }
             GL11.glFinish();
-
-            long t1 = System.nanoTime();
+            long[] smallSamples = new long[SMALL_RUNS];
             for (int i = 0; i < SMALL_RUNS; i++) {
                 smallBuf.rewind();
+                long t = System.nanoTime();
                 GL15.glBufferData(GL15.GL_ARRAY_BUFFER, smallBuf, GL15.GL_STREAM_DRAW);
+                GL11.glFinish();
+                smallSamples[i] = System.nanoTime() - t;
             }
-            GL11.glFinish();
-            long smallDurationNs = System.nanoTime() - t1;
+            smallBw  = bandwidthFromSamples(smallSamples, SMALL_SIZE);
+            smallCov = coefficientOfVariation(smallSamples);
 
-            smallBandwidth = (SMALL_SIZE * (double) SMALL_RUNS * 1_000_000_000.0)
-                    / (smallDurationNs * 1024.0 * 1024.0);
-            LOGGER.info("[Mercurizer]   Small buffer result: {} MB/s", String.format("%.0f", smallBandwidth));
+            long[] latencySamples = new long[LATENCY_RUNS];
+            for (int i = 0; i < LATENCY_RUNS; i++) {
+                smallBuf.rewind();
+                long t = System.nanoTime();
+                GL15.glBufferData(GL15.GL_ARRAY_BUFFER, smallBuf, GL15.GL_STREAM_DRAW);
+                GL11.glFinish();
+                latencySamples[i] = System.nanoTime() - t;
+            }
+            roundTripNs = trimmedMean(removeSpikesByMedian(latencySamples));
         } finally {
-            MemoryUtil.memFree(largeBuf);
-            MemoryUtil.memFree(smallBuf);
-            GL15.glDeleteBuffers(largeVbo);
-            GL15.glDeleteBuffers(smallVbo);
+            MemoryUtil.memFree(largeBuf); MemoryUtil.memFree(smallBuf);
+            GL15.glDeleteBuffers(largeVbo); GL15.glDeleteBuffers(smallVbo);
             GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, savedBinding);
         }
 
-        LOGGER.info("[Mercurizer]   Running CPU benchmark ({} MB working set x {} runs)...",
-                (CPU_ARRAY_SIZE * 4) / (1024 * 1024), CPU_RUNS);
-        double cpuMOps = runCpuBenchmark();
+        double[] cpuResult = runCpuBenchmark();
+        double cpuMOps = cpuResult[0];
+        double cpuCov  = cpuResult[1];
         int cores = Runtime.getRuntime().availableProcessors();
-        LOGGER.info("[Mercurizer]   CPU result: {} MOps/s x {} cores", String.format("%.0f", cpuMOps), cores);
-
-        LOGGER.info("[Mercurizer] Benchmark complete — GPU: {}/{} MB/s  CPU: {} MOps/s x {} cores",
-                String.format("%.0f", largeBandwidth),
-                String.format("%.0f", smallBandwidth),
-                String.format("%.0f", cpuMOps),
-                cores);
-
+        double worstCov = Math.max(largeCov, Math.max(smallCov, cpuCov));
+        boolean lowConf = worstCov > COV_LOW_CONFIDENCE;
+        LOGGER.info("[Mercurizer] Benchmark complete — GPU: {}/{} MB/s  CPU: {} MOps/s x {}  RT: {} us  CoV: {}{}",
+                String.format("%.0f", largeBw), String.format("%.0f", smallBw),
+                String.format("%.0f", cpuMOps), cores,
+                String.format("%.0f", roundTripNs / 1000.0),
+                String.format("%.0f%%", worstCov * 100),
+                lowConf ? " [LOW CONFIDENCE]" : "");
         return new MercurizerBenchmarkResult(
-                largeBandwidth, smallBandwidth,
-                cpuMOps, cores,
+                largeBw, smallBw, cpuMOps, cores,
                 caps.renderer, caps.version,
-                System.currentTimeMillis(), false);
+                System.currentTimeMillis(), false,
+                roundTripNs, worstCov, lowConf,
+                LARGE_SIZE, SMALL_SIZE);
     }
 
-    private static double runCpuBenchmark() {
+    private static double[] runCpuBenchmark() {
         int[] blocks   = new int[CPU_ARRAY_SIZE];
         int[] vertices = new int[CPU_ARRAY_SIZE];
         for (int i = 0; i < CPU_ARRAY_SIZE; i++) blocks[i] = i * 1664525 + 1013904223;
-
         for (int w = 0; w < CPU_WARMUP; w++) processCpuData(blocks, vertices);
-
-        long t0 = System.nanoTime();
-        long totalOps = 0;
-        for (int r = 0; r < CPU_RUNS; r++) totalOps += processCpuData(blocks, vertices);
-        long elapsed = System.nanoTime() - t0;
-
-        return (totalOps * 1_000.0) / elapsed;
+        long[] samples = new long[CPU_RUNS];
+        for (int r = 0; r < CPU_RUNS; r++) {
+            long t = System.nanoTime();
+            processCpuData(blocks, vertices);
+            samples[r] = System.nanoTime() - t;
+        }
+        double meanNs = trimmedMean(removeSpikesByMedian(samples));
+        double cov    = coefficientOfVariation(samples);
+        return new double[]{ meanNs > 0 ? (CPU_ARRAY_SIZE * 1_000.0) / meanNs : 1.0, cov };
     }
 
     private static long processCpuData(int[] blocks, int[] vertices) {
@@ -155,6 +150,51 @@ public final class MercurizerBenchmark {
             blocks[i]   = (block * 1664525 + 1013904223) & 0x7FFFFFFF;
         }
         return blocks.length;
+    }
+
+    private static double bandwidthFromSamples(long[] samples, int bufferSize) {
+        double meanNs = trimmedMean(removeSpikesByMedian(samples));
+        return meanNs > 0 ? (bufferSize * 1e9) / (meanNs * 1024.0 * 1024.0) : 1.0;
+    }
+
+    private static long[] removeSpikesByMedian(long[] samples) {
+        long[] sorted = Arrays.copyOf(samples, samples.length);
+        Arrays.sort(sorted);
+        long median = sorted[sorted.length / 2];
+        long threshold = (long) (median * SPIKE_FACTOR);
+        int valid = 0;
+        for (long s : samples) if (s > 0 && s <= threshold) valid++;
+        if (valid == 0) return samples;
+        long[] out = new long[valid]; int idx = 0;
+        for (long s : samples) if (s > 0 && s <= threshold) out[idx++] = s;
+        return out;
+    }
+
+    private static double trimmedMean(long[] samples) {
+        long[] sorted = Arrays.copyOf(samples, samples.length);
+        Arrays.sort(sorted);
+        int lo = (int) Math.floor(sorted.length * TRIM);
+        int hi = sorted.length - lo;
+        if (hi <= lo) return sorted[sorted.length / 2];
+        double sum = 0;
+        for (int i = lo; i < hi; i++) sum += sorted[i];
+        return sum / (hi - lo);
+    }
+
+    private static double coefficientOfVariation(long[] raw) {
+        long[] clean  = removeSpikesByMedian(raw);
+        long[] sorted = Arrays.copyOf(clean, clean.length);
+        Arrays.sort(sorted);
+        int lo = (int) Math.floor(sorted.length * TRIM);
+        int hi = sorted.length - lo;
+        if (hi <= lo) return 0;
+        double sum = 0;
+        for (int i = lo; i < hi; i++) sum += sorted[i];
+        double mean = sum / (hi - lo);
+        if (mean <= 0) return 0;
+        double varSum = 0;
+        for (int i = lo; i < hi; i++) varSum += Math.pow(sorted[i] - mean, 2);
+        return Math.sqrt(varSum / (hi - lo)) / mean;
     }
 
     private static void fillBuffer(ByteBuffer buf) {

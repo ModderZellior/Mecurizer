@@ -4,6 +4,7 @@ import net.caffeinemc.mods.sodium.client.MercurizerFrameTracker;
 import net.caffeinemc.mods.sodium.client.MercurizerRuntimePolicy;
 import net.caffeinemc.mods.sodium.client.MercurizerTuning;
 import net.caffeinemc.mods.sodium.client.render.chunk.RenderSectionManager;
+import net.minecraft.client.Minecraft;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -18,8 +19,8 @@ public class RenderSectionManagerMixin {
 
     @Inject(method = "updateChunks", at = @At("HEAD"))
     private void recordFrameTime(CallbackInfo ci) {
-        MercurizerFrameTracker.record(this.lastFrameDuration);
-        MercurizerTuning.checkRefinement();
+        MercurizerFrameTracker.onFrameStart();
+        MercurizerTuning.checkRefinement(Minecraft.getInstance().gameDirectory);
     }
 
     @Inject(method = "tickVisibleRenders", at = @At("HEAD"), cancellable = true)
