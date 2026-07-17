@@ -24,6 +24,9 @@
   "entrypoints" : {
     "client" : [
       "net.caffeinemc.mods.sodium.fabric.MercurizerFabricMod"
+    ],
+    "sodium:config" : [
+      "net.caffeinemc.mods.sodium.fabric.MercurizerConfigEntryPoint"
     ]
   },
   "accessWidener" : "mercurizer-fabric.accesswidener",
@@ -32,7 +35,7 @@
   ],
   "depends" : {
     "fabricloader" : ">=0.16.0",
-    "sodium" : "0.8.13-beta.2+mc1.21.11"
+    "sodium" : "0.8.13+mc1.21.11"
   },
   "breaks" : {
     "embeddium": "*",

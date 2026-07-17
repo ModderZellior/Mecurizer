@@ -1,5 +1,6 @@
 package net.caffeinemc.mods.sodium.client;
 
+import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
@@ -88,14 +89,37 @@ public final class MercurizerCapabilities {
         return cached;
     }
 
-    public static void clearCache() {
-        cached = null;
+    public static void clearCache() { cached = null; }
+
+    public boolean isIntegratedGpu() {
+        String r = renderer.toLowerCase();
+        String v = vendor.toLowerCase();
+        if (r.contains("intel") || v.contains("intel")) return true;
+        if (r.contains("llvmpipe") || r.contains("softpipe") || r.contains("virgl")) return true;
+        if ((r.contains("radeon") || r.contains("amd")) && r.contains("vega")) {
+            if (r.contains("rx vega")) return false;
+            return true;
+        }
+        if (v.contains("apple")) return true;
+        return false;
+    }
+
+    public static String getOsPlatform() {
+        String os = System.getProperty("os.name", "").toLowerCase();
+        if (os.contains("win")) return "windows";
+        if (os.contains("mac") || os.contains("darwin")) return "mac";
+        return "linux";
     }
 
     public static MercurizerCapabilities probeAndCache() {
         if (cached != null) return cached;
         synchronized (MercurizerCapabilities.class) {
             if (cached != null) return cached;
+            try {
+                GL.getCapabilities();
+            } catch (IllegalStateException e) {
+                return null;
+            }
             cached = probe();
         }
         return cached;

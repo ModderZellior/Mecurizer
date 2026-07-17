@@ -29,6 +29,9 @@ public class SodiumDebugEntryMixin {
             if (caps.totalVramMb > 0) {
                 displayer.addToGroup(group, "VRAM: " + caps.totalVramMb + " MB");
             }
+            if (caps.isIntegratedGpu()) {
+                displayer.addToGroup(group, "WARNING: Running on integrated GPU — see Mercurizer settings");
+            }
         }
         if (result != null) {
             displayer.addToGroup(group, String.format("GPU upload: %.0f MB/s (large) / %.0f MB/s (small)",
