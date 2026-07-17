@@ -72,6 +72,10 @@ public final class MercurizerFrameTracker {
         refinedThisSession = true;
     }
 
+    public static void resetRefinementWindow() {
+        stableStartNs = -1; stableFractionSum = 0; stableBudgetSum = 0; stableSamples = 0;
+    }
+
     private static boolean isStable() {
         long avg = smoothed();
         for (int i = 0; i < count; i++) {

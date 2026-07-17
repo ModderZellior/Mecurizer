@@ -18,6 +18,7 @@
     "addon.MercurizerMinecraftMixin",
     "addon.MercurizerWindowMixin",
     "addon.MercurizerTitleScreenMixin",
+    "addon.MercurizerPauseScreenMixin",
     "addon.MercurizerVideoSettingsMixin"
   ]
 }
