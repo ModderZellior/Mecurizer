@@ -1,132 +1,84 @@
 package net.caffeinemc.mods.sodium.client;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public final class MercurizerFrameTracker {
-    private static final int    WINDOW             = 16;
-    private static final long   STABLE_DURATION_NS = 30_000_000_000L;
-    private static final double STABLE_VARIANCE     = 0.50;
+    private static final Logger LOGGER = LoggerFactory.getLogger("Mercurizer");
 
-    private static final long[] frames  = new long[WINDOW];
-    private static int  index           = 0;
-    private static int  count           = 0;
-    private static long bestFrameNs     = Long.MAX_VALUE;
+    private static volatile long   uploadBudgetNs   = 2_000_000L;
+    private static volatile float  uploadFraction   = 0.25f;
+    private static volatile long   minUploadBudgetNs = 500_000L;
 
-    private static long   stableStartNs      = -1;
-    private static boolean refinedThisSession = false;
-    private static double  stableFractionSum  = 0;
-    private static double  stableBudgetSum    = 0;
-    private static long    stableSamples      = 0;
+    private static final int   WINDOW_SIZE   = 60;
+    private static final float SCALE_UP      = 1.08f;
+    private static final float SCALE_DOWN    = 0.88f;
+    private static final float TARGET_MARGIN = 0.90f;
 
-    private static float currentFraction = -1;
-    private static long  currentBudget   = -1;
+    private static final long[] frameTimes    = new long[WINDOW_SIZE];
+    private static int          frameIndex    = 0;
+    private static int          frameCount    = 0;
+    private static long         lastFrameNs   = -1;
 
-    private MercurizerFrameTracker() {}
+    // Refinement window state
+    static volatile long  stableStartNs     = -1;
+    static volatile float stableFractionSum = 0;
+    static volatile float stableBudgetSum   = 0;
+    static volatile int   stableSamples     = 0;
 
-    public static void record(long frameNs) {
-        if (frameNs <= 0) return;
-        frames[index] = frameNs;
-        index = (index + 1) % WINDOW;
-        if (count < WINDOW) count++;
-
-        if (frameNs < bestFrameNs) {
-            bestFrameNs = frameNs;
-        } else {
-            bestFrameNs = (long) (bestFrameNs * 0.9999 + frameNs * 0.0001);
+    public static void onFrameStart() {
+        long now = System.nanoTime();
+        if (lastFrameNs > 0) {
+            long dt = now - lastFrameNs;
+            frameTimes[frameIndex % WINDOW_SIZE] = dt;
+            frameIndex++;
+            if (frameCount < WINDOW_SIZE) frameCount++;
         }
+        lastFrameNs = now;
+    }
 
-        if (!refinedThisSession && count == WINDOW) {
-            if (isStable()) {
-                if (stableStartNs < 0) stableStartNs = System.nanoTime();
-            } else {
-                stableStartNs = -1;
-                stableFractionSum = 0;
-                stableBudgetSum = 0;
-                stableSamples = 0;
-            }
+    public static long getUploadBudgetNs() { return uploadBudgetNs; }
+    public static float getUploadFraction() { return uploadFraction; }
+
+    public static void onUploadComplete(long uploadNs, long targetFrameNs) {
+        long budget = uploadBudgetNs;
+        if (uploadNs > targetFrameNs * TARGET_MARGIN) {
+            budget = Math.max(minUploadBudgetNs, (long) (budget * SCALE_DOWN));
+        } else if (uploadNs < targetFrameNs * TARGET_MARGIN * 0.5f) {
+            budget = (long) (budget * SCALE_UP);
         }
+        uploadBudgetNs = budget;
     }
 
-    public static void accumulateDynamicValues(float fraction, long budget) {
-        if (!refinedThisSession && stableStartNs >= 0) {
-            stableFractionSum += fraction;
-            stableBudgetSum += budget;
-            stableSamples++;
-        }
+    public static long getP95FrameTimeNs() {
+        if (frameCount == 0) return 16_666_666L;
+        int n = frameCount;
+        long[] copy = new long[n];
+        for (int i = 0; i < n; i++) copy[i] = frameTimes[i];
+        java.util.Arrays.sort(copy);
+        return copy[(int) (n * 0.95)];
     }
 
-    public static boolean isRefinementReady() {
-        return !refinedThisSession
-                && stableStartNs >= 0
-                && stableSamples > 0
-                && (System.nanoTime() - stableStartNs) >= STABLE_DURATION_NS;
+    public static double getRecentMeanFrameTimeNs() {
+        if (frameCount == 0) return 16_666_666.0;
+        int n = frameCount;
+        double sum = 0;
+        for (int i = 0; i < n; i++) sum += frameTimes[i];
+        return sum / n;
     }
 
-    public static float getRefinedFraction() {
-        return stableSamples > 0 ? (float) (stableFractionSum / stableSamples) : 0;
+    public static void configure(long budgetNs, float fraction, long minBudgetNs) {
+        uploadBudgetNs   = budgetNs;
+        uploadFraction   = fraction;
+        minUploadBudgetNs = minBudgetNs;
+        LOGGER.info("[Mercurizer] Upload budget set: {}us, fraction: {}, min: {}us",
+                budgetNs / 1000, fraction, minBudgetNs / 1000);
     }
 
-    public static long getRefinedBudgetNs() {
-        return stableSamples > 0 ? (long) (stableBudgetSum / stableSamples) : 0;
-    }
-
-    public static void markRefined() {
-        refinedThisSession = true;
-    }
-
-    private static boolean isStable() {
-        long avg = smoothed();
-        for (int i = 0; i < count; i++) {
-            if (Math.abs(frames[i] - avg) > avg * STABLE_VARIANCE) return false;
-        }
-        return true;
-    }
-
-    private static long smoothed() {
-        if (count == 0) return bestFrameNs == Long.MAX_VALUE ? 16_666_667L : bestFrameNs;
-        long sum = 0;
-        for (int i = 0; i < count; i++) sum += frames[i];
-        return sum / count;
-    }
-
-    private static long target() {
-        return bestFrameNs == Long.MAX_VALUE ? 16_666_667L : bestFrameNs;
-    }
-
-    public static float getDynamicUploadFraction(float base) {
-        if (currentFraction < 0) currentFraction = base;
-        long avg = smoothed();
-        long tgt = target();
-        float ideal;
-        if (avg <= tgt) {
-            ideal = base;
-        } else {
-            double pressure = (double) avg / tgt;
-            ideal = (float) (base * Math.max(0.3, 1.0 - (pressure - 1.0) * 0.5));
-        }
-        if (ideal < currentFraction) {
-            currentFraction += (ideal - currentFraction) * 0.3f;
-        } else {
-            currentFraction += (ideal - currentFraction) * 0.02f;
-        }
-        return currentFraction;
-    }
-
-    public static long getDynamicMinBudgetNs(long base) {
-        if (currentBudget < 0) currentBudget = base;
-        long avg = smoothed();
-        long tgt = target();
-        long ideal;
-        if (avg <= tgt) {
-            ideal = base;
-        } else {
-            double pressure = (double) avg / tgt;
-            ideal = (long) (base * Math.max(0.25, 1.0 - (pressure - 1.0) * 0.6));
-        }
-        if (ideal < currentBudget) {
-            currentBudget += (long) ((ideal - currentBudget) * 0.3);
-        } else {
-            currentBudget += (long) ((ideal - currentBudget) * 0.02);
-        }
-        accumulateDynamicValues(currentFraction, currentBudget);
-        return currentBudget;
+    public static void resetRefinementWindow() {
+        stableStartNs     = -1;
+        stableFractionSum = 0;
+        stableBudgetSum   = 0;
+        stableSamples     = 0;
     }
 }

@@ -1,6 +1,7 @@
 package net.caffeinemc.mods.sodium.client;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -8,38 +9,36 @@ import java.io.File;
 
 public final class MercurizerBenchmarkController {
     private static final Logger LOGGER = LoggerFactory.getLogger("Mercurizer");
-    private static boolean doneThisSession = false;
 
-    private MercurizerBenchmarkController() {}
+    public static void checkAndRun(Screen currentScreen) {
+        MercurizerCapabilities caps = MercurizerCapabilities.detect();
+        File gameDir = Minecraft.getInstance().gameDirectory;
 
-    public static boolean shouldShowBenchmarkScreen(Minecraft mc) {
-        if (doneThisSession) return false;
-        MercurizerCapabilities caps = MercurizerCapabilities.probeAndCache();
-        if (!MercurizerBenchmarkStore.needsBenchmark(caps, mc.gameDirectory)) {
-            MercurizerBenchmarkResult stored = MercurizerBenchmarkStore.load(mc.gameDirectory);
-            if (stored != null) {
-                LOGGER.info("[Mercurizer] Loaded stored benchmark results — GPU: {}/{} MB/s  CPU: {} MOps/s x {} cores",
-                        String.format("%.0f", stored.bufferUploadBandwidthMBps),
-                        String.format("%.0f", stored.smallBufferUploadBandwidthMBps),
-                        String.format("%.0f", stored.cpuThroughputMOpsPerSec),
-                        stored.availableProcessors);
-                MercurizerTuning.apply(stored);
-            }
-            doneThisSession = true;
-            return false;
+        // Vulkan path: GPU benchmark meaningless, use CPU-only result
+        if (caps == null) {
+            LOGGER.info("[Mercurizer] Vulkan/non-GL backend detected, running CPU-only benchmark");
+            MercurizerBenchmarkResult result = MercurizerBenchmark.run(null);
+            MercurizerBenchmarkStore.saveWithHistory(result, gameDir);
+            MercurizerTuning.apply(MercurizerBenchmarkStore.load(gameDir), gameDir);
+            MercurizerTuning.setLatestRaw(result);
+            return;
         }
-        LOGGER.info("[Mercurizer] No valid stored benchmark found — will run benchmark now (GPU: {})", caps.renderer);
-        return true;
+
+        if (!MercurizerBenchmarkStore.needsBenchmark(caps, gameDir)) {
+            MercurizerBenchmarkResult latest = MercurizerBenchmarkStore.loadLatest(gameDir);
+            MercurizerTuning.apply(MercurizerBenchmarkStore.load(gameDir), gameDir);
+            MercurizerTuning.setLatestRaw(latest);
+            LOGGER.info("[Mercurizer] Reusing existing benchmark result");
+            return;
+        }
+
+        Minecraft.getInstance().setScreen(new MercurizerBenchmarkScreen(currentScreen));
     }
 
-    public static void markDone() {
-        doneThisSession = true;
-    }
-
-    public static void resetForRebenchmark() {
-        doneThisSession = false;
-        MercurizerCapabilities.clearCache();
-        File f = new File(new File(Minecraft.getInstance().gameDirectory, "mercurizer"), "benchmark.json");
-        f.delete();
+    public static void onBenchmarkComplete(MercurizerBenchmarkResult result) {
+        File gameDir = Minecraft.getInstance().gameDirectory;
+        MercurizerBenchmarkStore.saveWithHistory(result, gameDir);
+        MercurizerTuning.apply(MercurizerBenchmarkStore.load(gameDir), gameDir);
+        MercurizerTuning.setLatestRaw(result);
     }
 }
