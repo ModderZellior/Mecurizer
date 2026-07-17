@@ -62,7 +62,7 @@ public class MercurizerInfoScreen extends Screen {
 
     private List<String> buildLines() {
         List<String> lines = new ArrayList<>();
-        MercurizerCapabilities caps = MercurizerCapabilities.detect();
+        MercurizerCapabilities caps = MercurizerCapabilities.getCached();
 
         lines.add("§Hardware");
         if (caps != null) {

@@ -17,8 +17,17 @@ public final class MercurizerTuning {
     private static final float PLATEAU_TOLERANCE   = 0.05f;
     private static final int   PLATEAU_WINDOW      = 3;
 
+    private static volatile float baseUploadFraction    = 0.25f;
+    private static volatile long  baseMinUploadBudgetNs = 500_000L;
+
     public static void setLatestRaw(MercurizerBenchmarkResult r) { latestRaw = r; }
     public static MercurizerBenchmarkResult getLatestRaw() { return latestRaw; }
+    public static MercurizerBenchmarkResult getLastResult() { return lastResult; }
+    public static float getBaseUploadFraction() { return baseUploadFraction; }
+    public static long  getBaseMinUploadBudgetNs() { return baseMinUploadBudgetNs; }
+    public static long  getTextureAnimThresholdNs() { return Long.MAX_VALUE; }
+    public static float getUploadFraction() { return MercurizerFrameTracker.getUploadFraction(); }
+    public static long  getMinUploadBudgetNs() { return MercurizerFrameTracker.getUploadBudgetNs(); }
 
     public static void apply(MercurizerBenchmarkResult result, File gameDirectory) {
         if (result == null) return;
@@ -65,6 +74,8 @@ public final class MercurizerTuning {
             }
         }
 
+        baseUploadFraction    = uploadFraction;
+        baseMinUploadBudgetNs = minUploadBudgetNs;
         MercurizerFrameTracker.configure(uploadBudgetNs, uploadFraction, minUploadBudgetNs);
         LOGGER.info("[Mercurizer] Tuning applied — fraction={}, budget={}us, minBudget={}us",
                 String.format("%.2f", uploadFraction),

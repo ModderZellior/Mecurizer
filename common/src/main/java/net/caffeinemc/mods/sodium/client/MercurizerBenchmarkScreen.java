@@ -116,7 +116,7 @@ public class MercurizerBenchmarkScreen extends Screen {
                 if (now - lingerStartNs >= LINGER_NS) phase = Phase.INIT;
             }
             case INIT -> {
-                MercurizerCapabilities caps = MercurizerCapabilities.detect();
+                MercurizerCapabilities caps = MercurizerCapabilities.probeAndCache();
                 if (caps == null) {
                     // Vulkan — CPU only
                     startCpuThread();
@@ -249,7 +249,7 @@ public class MercurizerBenchmarkScreen extends Screen {
     }
 
     private void finalizeBenchmark() {
-        MercurizerCapabilities caps = MercurizerCapabilities.detect();
+        MercurizerCapabilities caps = MercurizerCapabilities.getCached();
 
         double largeBw = -1, smallBw = -1, roundTripNs = 0, largeCov = 0, smallCov = 0;
         if (caps != null) {
