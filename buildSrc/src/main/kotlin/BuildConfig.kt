@@ -2,12 +2,12 @@
 
 object BuildConfig {
     val MINECRAFT_VERSION: String = "26.1.2"
-    val SODIUM_VERSION: String = "0.9.1-beta.2"
+    val SODIUM_VERSION: String = "0.9.1"
     val FABRIC_LOADER_VERSION: String = "0.19.2"
     val FABRIC_API_VERSION: String = "0.148.0+26.1.2"
     val SUPPORT_FRAPI : Boolean = true
 
-    val MOD_VERSION: String = "1.3"
+    val MOD_VERSION: String = "1.1"
 
     val RELEASE_TAG: String = "mc$MINECRAFT_VERSION-$MOD_VERSION"
 

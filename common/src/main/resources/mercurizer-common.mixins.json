@@ -13,7 +13,6 @@
     "addon.SodiumConfigBuilderMixin",
     "addon.SodiumDebugEntryMixin",
     "addon.MercurizerTitleScreenMixin",
-    "addon.MercurizerPauseScreenMixin",
-    "addon.MercurizerVideoSettingsMixin"
+    "addon.MercurizerPauseScreenMixin"
   ]
 }
