@@ -7,100 +7,89 @@ import net.minecraft.network.chat.Component;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL15;
 import org.lwjgl.system.MemoryUtil;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 public class MercurizerBenchmarkScreen extends Screen {
     private static final Logger MERC_LOG = LoggerFactory.getLogger("Mercurizer");
-    private static final long WARMUP_LINGER_NS = 60_000_000L;
-    private static final long RESULT_LINGER_NS = 3_000_000_000L;
 
-    // Fallback sizes if Sodium introspection fails (#7)
-    private static final int LARGE_SIZE_DEFAULT = 4 * 1024 * 1024;
-    private static final int SMALL_SIZE_DEFAULT = 1 * 1024 * 1024;
+    private static final int    CHUNK_SIZE    = 128 * 1024;
+    private static final int    WARMUP_FRAMES = 8;
+    private static final int    MIN_SAMPLES   = 10;
+    private static final int    MAX_SAMPLES   = 60;
+    private static final double TARGET_COV    = 0.08;
+    private static final int    RAMP_SAMPLES  = 12;
+    private static final int    LATENCY_RUNS  = 20;
+    private static final int    CPU_ARRAY_SIZE = 1024 * 1024;
+    private static final int    CPU_WARMUP    = 10;
+    private static final int    CPU_RUNS      = 25;
+    private static final double TRIM          = 0.15;
+    private static final double SPIKE_FACTOR  = 3.0;
+    private static final double COV_LOW_CONF  = 0.20;
+    private static final long   LINGER_NS     = 60_000_000L;
+    private static final long   RESULT_NS     = 3_000_000_000L;
 
-    // Sample counts (#2: ≥25 samples, ≥10 warmups)
-    private static final int LARGE_WARMUP   = 12;
-    private static final int LARGE_RUNS     = 30;
-    private static final int SMALL_WARMUP   = 12;
-    private static final int SMALL_RUNS     = 30;
-    private static final int LATENCY_RUNS   = 20; // #8
-    private static final int CPU_ARRAY_SIZE = 1024 * 1024;
-    private static final int CPU_WARMUP     = 10;
-    private static final int CPU_RUNS       = 25;
-    private static final int RAMP_UP_MAX    = 20; // #6
-
-    // Trimming and spike rejection (#1, #4)
-    private static final double TRIM        = 0.15;
-    private static final double SPIKE_FACTOR = 3.0;
-    private static final double COV_LOW_CONFIDENCE = 0.20; // #3
-
-    private static final String BENCH_TITLE = "Mercurizer — Benchmarking GPU & CPU...";
-    private static volatile int cachedLargeBufferSize = -1;
+    private static final float PLATEAU_TOL = 0.05f;
+    private static final int   PLATEAU_WIN = 3;
 
     private enum Phase {
         LINGER, INIT, RAMP_UP,
-        WARMUP_LARGE, MEASURE_LARGE,
-        WARMUP_SMALL, MEASURE_SMALL, MEASURE_LATENCY,
-        CPU_WAIT, RESULT
+        WARMUP_SIZE, MEASURE_SIZE,
+        MEASURE_LATENCY, CPU_WAIT, RESULT
     }
 
     private final Screen parent;
-    private final MercurizerCapabilities caps;
     private Phase phase = Phase.LINGER;
     private long phaseStartNs = -1;
-    private int step = 0;
+    private int frameCounter = 0;
 
-    // Detected buffer sizes (#7)
-    private int largeBufferSize;
-    private int smallBufferSize;
+    // Multi-size
+    private int[]        sizeSet;
+    private int          sizeIndex;
+    private int[]        allVbos;
+    private ByteBuffer[] allBufs;
+    private int          savedBinding;
+    private double[]     bwResults;
+    private double[]     covResults;
 
-    private int largeVbo = -1, smallVbo = -1, savedBinding = 0;
-    private ByteBuffer largeBuf, smallBuf;
+    // Adaptive sampling
+    private final List<Long> currentSamples = new ArrayList<>();
 
-    // Per-sample timing arrays (#1, #3, #4)
-    private long[] largeTimeSamples;
-    private long[] smallTimeSamples;
-    private long[] latencyTimeSamples;
+    // Ramp-up
+    private final float[] rampBw  = new float[RAMP_SAMPLES];
+    private int           rampIdx;
 
-    // Computed results
-    private double largeBw, smallBw;
-    private double largeCov, smallCov;
-    private double smallBufferRoundTripNs;
+    // Latency
+    private final long[] latencySamples = new long[LATENCY_RUNS];
+    private int          latencyIdx;
 
-    // Ramp-up window (#6)
-    private final double[] rampBwWindow = new double[3];
+    // CPU benchmark
+    private volatile Thread  cpuThread = null;
+    private volatile double  cpuMOps   = -1;
+    private volatile double  cpuCov    = 0;
 
-    // CPU benchmark (#5: runs simultaneously with GPU phases)
-    private Thread cpuThread;
-    private volatile double cpuMOps = -1;
-    private long[] cpuSamples;
-    private double cpuCov;
+    // Result + re-run
+    private MercurizerBenchmarkResult result = null;
+    private long resultSinceNs = -1;
+    private int  attemptNumber = 1;
+    private MercurizerBenchmarkResult bestAttempt = null;
 
-    private MercurizerBenchmarkResult result;
-    private long resultSinceNs;
+    static volatile int cachedLargeBufferSize = -1;
 
     public MercurizerBenchmarkScreen(Screen parent) {
         super(Component.literal("Mercurizer"));
         this.parent = parent;
-        MercurizerCapabilities c = MercurizerCapabilities.getCached();
-        this.caps = c != null ? c : MercurizerCapabilities.probeAndCache();
-        this.largeBufferSize = detectSodiumLargeBufferSize();
-        this.smallBufferSize = largeBufferSize / 4;
     }
 
-    // #11: render title screen in background; we overlay on top
     @Override
     public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float delta) {
-        if (parent != null) {
-            parent.renderBackground(graphics, mouseX, mouseY, delta);
-        } else {
-            super.renderBackground(graphics, mouseX, mouseY, delta);
-        }
+        if (parent != null) parent.renderBackground(graphics, mouseX, mouseY, delta);
+        else super.renderBackground(graphics, mouseX, mouseY, delta);
     }
 
     @Override
@@ -108,344 +97,431 @@ public class MercurizerBenchmarkScreen extends Screen {
         long now = System.nanoTime();
         if (phaseStartNs < 0) phaseStartNs = now;
 
-        // #11: render parent screen behind our overlay
-        if (parent != null) {
-            parent.render(graphics, -999, -999, delta);
-        }
+        if (parent != null) parent.render(graphics, -999, -999, delta);
 
         switch (phase) {
-            case LINGER:
-                draw(graphics, 0f, BENCH_TITLE, "This runs once per GPU or driver update.");
-                if (now - phaseStartNs >= WARMUP_LINGER_NS) {
-                    advance(caps == null ? Phase.CPU_WAIT : Phase.INIT);
-                }
+            case LINGER: {
+                int startRun = MercurizerBenchmarkController.startupRunNumber;
+                String lingerSub = startRun >= 2
+                        ? String.format("Running again to improve accuracy (run %d of 3)", startRun)
+                        : "";
+                draw(graphics, "Mercurizer  -  preparing benchmark...", lingerSub, 0f);
+                if (now - phaseStartNs >= LINGER_NS) advance(Phase.INIT);
                 break;
-
-            case INIT:
+            }
+            case INIT: {
+                MercurizerCapabilities caps = MercurizerCapabilities.getCached();
+                if (caps == null) caps = MercurizerCapabilities.probeAndCache();
+                if (caps == null) {
+                    startCpuThread();
+                    advance(Phase.CPU_WAIT);
+                    break;
+                }
                 savedBinding = GL11.glGetInteger(GL15.GL_ARRAY_BUFFER_BINDING);
-                largeBuf = MemoryUtil.memAlloc(largeBufferSize);
-                smallBuf = MemoryUtil.memAlloc(smallBufferSize);
-                fill(largeBuf); fill(smallBuf);
-                largeVbo = GL15.glGenBuffers();
-                smallVbo = GL15.glGenBuffers();
-                largeTimeSamples   = new long[LARGE_RUNS];
-                smallTimeSamples   = new long[SMALL_RUNS];
-                latencyTimeSamples = new long[LATENCY_RUNS];
-                // #5: start CPU benchmark now, runs simultaneously with all GPU phases
+                int largeSize = detectLargeBufferSize();
+                cachedLargeBufferSize = largeSize;
+                buildSizeSet(caps, largeSize);
+                allVbos = new int[sizeSet.length];
+                allBufs = new ByteBuffer[sizeSet.length];
+                for (int i = 0; i < sizeSet.length; i++) {
+                    allBufs[i] = MemoryUtil.memAlloc(sizeSet[i]);
+                    fillBuf(allBufs[i]);
+                    allVbos[i] = GL15.glGenBuffers();
+                }
+                bwResults  = new double[sizeSet.length];
+                covResults = new double[sizeSet.length];
+                sizeIndex  = 0; rampIdx = 0;
                 startCpuThread();
                 advance(Phase.RAMP_UP);
-                draw(graphics, 0.03f, BENCH_TITLE, "Initialising...");
-                break;
-
-            case RAMP_UP: { // #6: wait for GPU to reach stable throughput
-                GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, largeVbo);
-                largeBuf.rewind();
-                long t0 = System.nanoTime();
-                GL15.glBufferData(GL15.GL_ARRAY_BUFFER, largeBuf, GL15.GL_STREAM_DRAW);
-                GL11.glFinish();
-                double bw = (largeBufferSize * 1e9) / ((System.nanoTime() - t0) * 1024.0 * 1024.0);
-                rampBwWindow[step % 3] = bw;
-                step++;
-                boolean plateau = step >= 3 && isPlateaued(rampBwWindow);
-                draw(graphics, 0.03f + Math.min(0.09f, step / (float) RAMP_UP_MAX * 0.09f),
-                        BENCH_TITLE, plateau ? "GPU ready." : String.format("GPU power ramp-up (%d/%d)...", step, RAMP_UP_MAX));
-                if (plateau || step >= RAMP_UP_MAX) advance(Phase.WARMUP_LARGE);
+                draw(graphics, "Mercurizer  -  warming up GPU...", "Phase 1 of " + (sizeSet.length + 2), 0.05f);
                 break;
             }
-
-            case WARMUP_LARGE:
-                GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, largeVbo);
-                largeBuf.rewind();
-                GL15.glBufferData(GL15.GL_ARRAY_BUFFER, largeBuf, GL15.GL_STREAM_DRAW);
-                step++;
-                draw(graphics, 0.12f + (step / (float) LARGE_WARMUP) * 0.12f,
-                        BENCH_TITLE, "Warming up large buffer...");
-                if (step >= LARGE_WARMUP) { GL11.glFinish(); advance(Phase.MEASURE_LARGE); }
-                break;
-
-            case MEASURE_LARGE: { // one sample per frame (#1, #3, #4)
-                GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, largeVbo);
-                largeBuf.rewind();
+            case RAMP_UP: {
+                int lastIdx = allVbos.length - 1;
+                GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, allVbos[lastIdx]);
+                allBufs[lastIdx].rewind();
                 long t0 = System.nanoTime();
-                GL15.glBufferData(GL15.GL_ARRAY_BUFFER, largeBuf, GL15.GL_STREAM_DRAW);
+                GL15.glBufferData(GL15.GL_ARRAY_BUFFER, allBufs[lastIdx], GL15.GL_STREAM_DRAW);
                 GL11.glFinish();
-                largeTimeSamples[step] = System.nanoTime() - t0;
-                step++;
-                draw(graphics, 0.24f + (step / (float) LARGE_RUNS) * 0.16f,
-                        BENCH_TITLE, String.format("Large buffer: sample %d/%d", step, LARGE_RUNS));
-                if (step >= LARGE_RUNS) {
-                    largeBw  = bandwidthFromSamples(largeTimeSamples, largeBufferSize);
-                    largeCov = coefficientOfVariation(largeTimeSamples);
-                    advance(Phase.WARMUP_SMALL);
+                long dt = System.nanoTime() - t0;
+                float bw = dt > 0 ? (float)((sizeSet[lastIdx] * 1e9) / (dt * 1024.0 * 1024.0)) : 1f;
+                rampBw[rampIdx % RAMP_SAMPLES] = bw;
+                rampIdx++;
+                frameCounter++;
+                draw(graphics, "Mercurizer  -  warming up GPU...",
+                        "Phase 1 of " + (sizeSet.length + 2),
+                        0.05f + 0.10f * Math.min(1f, frameCounter / (float)RAMP_SAMPLES));
+                boolean plateaued = rampIdx >= RAMP_SAMPLES && isPlateaued();
+                boolean timedOut  = rampIdx >= RAMP_SAMPLES * 3;
+                if (plateaued || timedOut) {
+                    sizeIndex = 0;
+                    currentSamples.clear();
+                    advance(Phase.WARMUP_SIZE);
                 }
                 break;
             }
-
-            case WARMUP_SMALL:
-                GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, smallVbo);
-                smallBuf.rewind();
-                GL15.glBufferData(GL15.GL_ARRAY_BUFFER, smallBuf, GL15.GL_STREAM_DRAW);
-                step++;
-                draw(graphics, 0.40f + (step / (float) SMALL_WARMUP) * 0.10f,
-                        BENCH_TITLE, String.format("Large: %.0f MB/s — Warming up small buffer...", largeBw));
-                if (step >= SMALL_WARMUP) { GL11.glFinish(); advance(Phase.MEASURE_SMALL); }
-                break;
-
-            case MEASURE_SMALL: { // one sample per frame
-                GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, smallVbo);
-                smallBuf.rewind();
-                long t0 = System.nanoTime();
-                GL15.glBufferData(GL15.GL_ARRAY_BUFFER, smallBuf, GL15.GL_STREAM_DRAW);
+            case WARMUP_SIZE: {
+                int si = sizeIndex;
+                GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, allVbos[si]);
+                allBufs[si].rewind();
+                GL15.glBufferData(GL15.GL_ARRAY_BUFFER, allBufs[si], GL15.GL_STREAM_DRAW);
                 GL11.glFinish();
-                smallTimeSamples[step] = System.nanoTime() - t0;
-                step++;
-                draw(graphics, 0.50f + (step / (float) SMALL_RUNS) * 0.16f,
-                        BENCH_TITLE, String.format("Small buffer: sample %d/%d", step, SMALL_RUNS));
-                if (step >= SMALL_RUNS) {
-                    smallBw  = bandwidthFromSamples(smallTimeSamples, smallBufferSize);
-                    smallCov = coefficientOfVariation(smallTimeSamples);
-                    advance(Phase.MEASURE_LATENCY);
+                frameCounter++;
+                int phaseNum = 2 + si, totalPhases = sizeSet.length + 2;
+                draw(graphics, String.format("Mercurizer  -  warming up %s...", sizeLabel(sizeSet[si])),
+                        "Phase " + phaseNum + " of " + totalPhases,
+                        sizeProgress(si, frameCounter / (float)WARMUP_FRAMES));
+                if (frameCounter >= WARMUP_FRAMES) {
+                    currentSamples.clear();
+                    advance(Phase.MEASURE_SIZE);
                 }
                 break;
             }
-
-            case MEASURE_LATENCY: { // #8: single-upload round-trip latency
-                GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, smallVbo);
-                smallBuf.rewind();
-                long t0 = System.nanoTime();
-                GL15.glBufferData(GL15.GL_ARRAY_BUFFER, smallBuf, GL15.GL_STREAM_DRAW);
-                GL11.glFinish();
-                latencyTimeSamples[step] = System.nanoTime() - t0;
-                step++;
-                draw(graphics, 0.66f + (step / (float) LATENCY_RUNS) * 0.08f,
-                        BENCH_TITLE, String.format("Latency measurement: %d/%d", step, LATENCY_RUNS));
-                if (step >= LATENCY_RUNS) {
-                    smallBufferRoundTripNs = trimmedMean(removeSpikesByMedian(latencyTimeSamples));
-                    MemoryUtil.memFree(largeBuf); MemoryUtil.memFree(smallBuf);
-                    GL15.glDeleteBuffers(largeVbo); GL15.glDeleteBuffers(smallVbo);
-                    GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, savedBinding);
-                    advance(Phase.CPU_WAIT);
+            case MEASURE_SIZE: {
+                int si = sizeIndex;
+                GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, allVbos[si]);
+                allBufs[si].rewind();
+                long ns = measureUpload(allBufs[si]);
+                currentSamples.add(ns);
+                frameCounter++;
+                double cov = currentCov();
+                boolean covOk  = currentSamples.size() >= MIN_SAMPLES && cov <= TARGET_COV;
+                boolean maxHit = currentSamples.size() >= MAX_SAMPLES;
+                draw(graphics,
+                        String.format("Mercurizer  -  measuring %s...", sizeLabel(sizeSet[si])),
+                        String.format("%s: %d samples, CoV %.0f%%%s",
+                                sizeLabel(sizeSet[si]), currentSamples.size(), cov * 100, ""),
+                        sizeProgress(si, Math.min(1f, currentSamples.size() / (float)MAX_SAMPLES)));
+                if (covOk || maxHit) {
+                    long[] arr = toLongArray(currentSamples);
+                    bwResults[si]  = bwFromNs(arr, sizeSet[si]);
+                    covResults[si] = coefficientOfVariation(arr);
+                    sizeIndex++;
+                    if (sizeIndex < sizeSet.length) {
+                        currentSamples.clear();
+                        advance(Phase.WARMUP_SIZE);
+                    } else {
+                        latencyIdx = 0;
+                        advance(Phase.MEASURE_LATENCY);
+                    }
                 }
                 break;
             }
-
-            case CPU_WAIT:
-                // CPU thread was started in INIT; just wait for it
-                if (cpuThread == null) startCpuThread(); // fallback for Vulkan path
-                float cpuProg = cpuMOps >= 0 ? 0.95f
-                        : Math.min(0.94f, 0.74f + (now - phaseStartNs) / 3_000_000_000f * 0.21f);
-                String cpuSubtext = caps != null
-                        ? String.format("GPU: %.0f / %.0f MB/s — Running CPU benchmark...", largeBw, smallBw)
-                        : "Vulkan backend — Running CPU benchmark...";
-                draw(graphics, cpuProg, "Mercurizer — Benchmarking CPU...", cpuSubtext);
-                if (cpuMOps >= 0) finalizeBenchmark();
+            case MEASURE_LATENCY: {
+                GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, allVbos[0]);
+                allBufs[0].rewind();
+                latencySamples[latencyIdx++] = measureUpload(allBufs[0]);
+                frameCounter++;
+                int totalPhases = sizeSet != null ? sizeSet.length + 2 : 4;
+                draw(graphics, "Mercurizer  -  measuring latency...",
+                        "Phase " + totalPhases + " of " + totalPhases,
+                        0.85f + 0.05f * (frameCounter / (float)LATENCY_RUNS));
+                if (latencyIdx >= LATENCY_RUNS) freeGlResources();
                 break;
-
-            case RESULT:
-                if (now - resultSinceNs < RESULT_LINGER_NS) {
-                    String doneMsg = result.bufferUploadBandwidthMBps < 0
-                            ? String.format("Mercurizer — Done. CPU: %.0f MOps/s x %d cores (Vulkan — no GPU benchmark)",
-                                    result.cpuThroughputMOpsPerSec, result.availableProcessors)
-                            : String.format("Mercurizer — Done. GPU: %.0f MB/s  |  CPU: %.0f MOps/s x %d cores",
-                                    result.bufferUploadBandwidthMBps, result.cpuThroughputMOpsPerSec, result.availableProcessors);
-                    String confText = result.isLowConfidence
-                            ? String.format("Low confidence (CoV %.0f%%) — results may vary", result.benchmarkConfidenceScore * 100)
-                            : String.format("Upload: %.1f%%  |  Min budget: %.3f ms  |  Synthetic",
-                                    MercurizerTuning.getUploadFraction() * 100,
-                                    MercurizerTuning.getMinUploadBudgetNs() / 1_000_000.0);
-                    draw(graphics, 1f, doneMsg, confText);
-                } else {
-                    Minecraft.getInstance().setScreen(parent);
-                }
+            }
+            case CPU_WAIT: {
+                String cpuSub = attemptNumber > 1
+                        ? String.format("High variance  -  re-running (attempt %d of 3)...", attemptNumber)
+                        : "Waiting for CPU benchmark...";
+                draw(graphics, "Mercurizer  -  waiting for CPU benchmark...", cpuSub, 0.90f);
+                if (cpuMOps >= 0) handleBenchmarkDone();
                 break;
+            }
+            case RESULT: {
+                if (result == null) { Minecraft.getInstance().setScreen(parent); break; }
+                String line1 = result.bufferUploadBandwidthMBps < 0
+                        ? String.format("Done.  CPU: %.0f MOps/s x %d cores",
+                                result.cpuThroughputMOpsPerSec, result.availableProcessors)
+                        : String.format("Done.  Chunk: %.0f MB/s  |  Region: %.0f MB/s  |  CPU: %.0f MOps/s x %d",
+                                result.smallBufferUploadBandwidthMBps, result.bufferUploadBandwidthMBps,
+                                result.cpuThroughputMOpsPerSec, result.availableProcessors);
+                String line2 = String.format("Upload: %.1f%%  |  Min budget: %.3f ms%s",
+                        MercurizerTuning.getUploadFraction() * 100,
+                        MercurizerTuning.getMinUploadBudgetNs() / 1_000_000.0,
+                        result.isLowConfidence ? "  [LOW CONFIDENCE]" : "");
+                draw(graphics, line1, line2, 1f);
+                if (now - resultSinceNs >= RESULT_NS) Minecraft.getInstance().setScreen(parent);
+                break;
+            }
         }
     }
 
     private void advance(Phase next) {
         phase = next;
         phaseStartNs = System.nanoTime();
-        step = 0;
+        frameCounter = 0;
     }
 
-    private void startCpuThread() {
-        cpuThread = new Thread(this::runCpu, "Mercurizer-CPU-Bench");
-        cpuThread.setDaemon(true);
-        cpuThread.start();
+    // --- GL helpers ---
+
+    private long measureUpload(ByteBuffer buf) {
+        long t0 = System.nanoTime();
+        GL15.glBufferData(GL15.GL_ARRAY_BUFFER, buf, GL15.GL_STREAM_DRAW);
+        GL11.glFinish();
+        return System.nanoTime() - t0;
     }
 
-    private void finalizeBenchmark() {
-        // #3: worst CoV across all three tests
-        double worstCov = Math.max(largeCov, Math.max(smallCov, cpuCov));
-        boolean lowConf = worstCov > COV_LOW_CONFIDENCE;
-        if (lowConf) {
-            MERC_LOG.warn("[Mercurizer] Low confidence benchmark result — worst CoV: {}", String.format("%.0f%%", worstCov * 100));
+    private void freeGlResources() {
+        if (allBufs != null) {
+            for (ByteBuffer b : allBufs) if (b != null) MemoryUtil.memFree(b);
+            allBufs = null;
         }
-
-        String renderer = caps != null ? caps.renderer : "Vulkan";
-        String version  = caps != null ? caps.version  : "Vulkan";
-        double gpuLarge = caps != null ? largeBw              : -1;
-        double gpuSmall = caps != null ? smallBw              : -1;
-        double rtNs     = caps != null ? smallBufferRoundTripNs : 0;
-        int lbSize      = caps != null ? largeBufferSize : 0;
-        int sbSize      = caps != null ? smallBufferSize : 0;
-
-        result = new MercurizerBenchmarkResult(
-                gpuLarge, gpuSmall,
-                cpuMOps, Runtime.getRuntime().availableProcessors(),
-                renderer, version,
-                System.currentTimeMillis(), false,
-                rtNs, worstCov, lowConf,
-                lbSize, sbSize);
-
-        MercurizerBenchmarkStore.saveWithHistory(result, Minecraft.getInstance().gameDirectory);
-        // Apply weighted average so tuning benefits from history (#9)
-        MercurizerBenchmarkResult weighted = MercurizerBenchmarkStore.load(Minecraft.getInstance().gameDirectory);
-        MercurizerTuning.apply(weighted != null ? weighted : result);
-        MercurizerTuning.setLatestRaw(result);
-        MercurizerBenchmarkController.markDone();
-        resultSinceNs = System.nanoTime();
-        phase = Phase.RESULT;
-    }
-
-    // CPU benchmark — runs on background thread simultaneously with GPU phases (#5)
-    private void runCpu() {
-        int[] blocks   = new int[CPU_ARRAY_SIZE];
-        int[] vertices = new int[CPU_ARRAY_SIZE];
-        for (int i = 0; i < CPU_ARRAY_SIZE; i++) blocks[i] = i * 1664525 + 1013904223;
-        for (int w = 0; w < CPU_WARMUP; w++) processCpu(blocks, vertices);
-
-        cpuSamples = new long[CPU_RUNS];
-        for (int r = 0; r < CPU_RUNS; r++) {
-            long t = System.nanoTime();
-            processCpu(blocks, vertices);
-            cpuSamples[r] = System.nanoTime() - t;
+        if (allVbos != null) {
+            for (int v : allVbos) if (v >= 0) GL15.glDeleteBuffers(v);
+            allVbos = null;
         }
-        // Trimmed mean of run times, then derive MOps/s
-        double meanNs = trimmedMean(removeSpikesByMedian(cpuSamples));
-        cpuCov  = coefficientOfVariation(cpuSamples);
-        cpuMOps = meanNs > 0 ? (CPU_ARRAY_SIZE * 1_000.0) / meanNs : 1.0;
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, savedBinding);
+        advance(Phase.CPU_WAIT);
     }
 
-    private long processCpu(int[] blocks, int[] vertices) {
-        for (int i = 0; i < blocks.length; i++) {
-            int b = blocks[i];
-            vertices[i] = ((i & 0xF) << 20) | (((i >> 4) & 0xF) << 10) | ((i >> 8) & 0xF)
-                    | (((b >>> 4) & 0xFFF) << 1) | Integer.bitCount(b & 0x3F);
-            blocks[i] = (b * 1664525 + 1013904223) & 0x7FFFFFFF;
-        }
-        return blocks.length;
+    // --- Size set ---
+
+    private void buildSizeSet(MercurizerCapabilities caps, int largeSize) {
+        if (caps == null) { sizeSet = new int[]{ CHUNK_SIZE }; return; }
+        int[] candidates = { CHUNK_SIZE, 512 * 1024, 2 * 1024 * 1024, largeSize };
+        Arrays.sort(candidates);
+        int n = 1;
+        for (int i = 1; i < candidates.length; i++)
+            if (candidates[i] > candidates[n - 1] + 32 * 1024) candidates[n++] = candidates[i];
+        sizeSet = Arrays.copyOf(candidates, n);
     }
 
-    // #1, #4: spike rejection then trimmed mean, returns bandwidth in MB/s
-    private double bandwidthFromSamples(long[] samples, int bufferSize) {
-        long[] clean = removeSpikesByMedian(samples);
-        double meanNs = trimmedMean(clean);
-        return meanNs > 0 ? (bufferSize * 1e9) / (meanNs * 1024.0 * 1024.0) : 1.0;
-    }
-
-    // #4: remove samples > SPIKE_FACTOR × median
-    private long[] removeSpikesByMedian(long[] samples) {
-        long[] sorted = Arrays.copyOf(samples, samples.length);
-        Arrays.sort(sorted);
-        long median = sorted[sorted.length / 2];
-        long threshold = (long) (median * SPIKE_FACTOR);
-        int valid = 0;
-        for (long s : samples) if (s > 0 && s <= threshold) valid++;
-        if (valid == 0) return samples;
-        long[] out = new long[valid];
-        int idx = 0;
-        for (long s : samples) if (s > 0 && s <= threshold) out[idx++] = s;
-        return out;
-    }
-
-    // #1: trimmed mean, discarding bottom and top TRIM fraction
-    private double trimmedMean(long[] samples) {
-        long[] sorted = Arrays.copyOf(samples, samples.length);
-        Arrays.sort(sorted);
-        int lo = (int) Math.floor(sorted.length * TRIM);
-        int hi = sorted.length - lo;
-        if (hi <= lo) return sorted[sorted.length / 2];
-        double sum = 0;
-        for (int i = lo; i < hi; i++) sum += sorted[i];
-        return sum / (hi - lo);
-    }
-
-    // #3: coefficient of variation on the trimmed, de-spiked set
-    private double coefficientOfVariation(long[] raw) {
-        long[] clean  = removeSpikesByMedian(raw);
-        long[] sorted = Arrays.copyOf(clean, clean.length);
-        Arrays.sort(sorted);
-        int lo = (int) Math.floor(sorted.length * TRIM);
-        int hi = sorted.length - lo;
-        if (hi <= lo) return 0;
-        double sum = 0;
-        for (int i = lo; i < hi; i++) sum += sorted[i];
-        double mean = sum / (hi - lo);
-        if (mean <= 0) return 0;
-        double varSum = 0;
-        for (int i = lo; i < hi; i++) varSum += Math.pow(sorted[i] - mean, 2);
-        return Math.sqrt(varSum / (hi - lo)) / mean;
-    }
-
-    // #6: plateau = all 3 window values within 5% of each other
-    private boolean isPlateaued(double[] window) {
-        double min = Double.MAX_VALUE, max = 0;
-        for (double v : window) { if (v > max) max = v; if (v < min) min = v; }
-        return min > 0 && (max - min) / min < 0.05;
-    }
-
-    // #7: try to read Sodium's actual RenderRegion buffer size via reflection (cached)
-    private static int detectSodiumLargeBufferSize() {
-        if (cachedLargeBufferSize > 0) return cachedLargeBufferSize;
-        String[] classes = {
+    private static int detectLargeBufferSize() {
+        String[] classNames = {
             "net.caffeinemc.mods.sodium.client.render.chunk.region.RenderRegion",
             "net.caffeinemc.mods.sodium.client.render.chunk.RenderSection",
             "net.caffeinemc.mods.sodium.client.render.chunk.arena.GpuBufferArena"
         };
-        String[] fields = {
+        String[] fieldNames = {
             "RENDER_PASS_VERTEX_BUFFER_SIZE", "REGION_SIZE", "BUFFER_SIZE",
             "VERTEX_DATA_SIZE", "ARENA_SIZE"
         };
-        for (String cls : classes) {
-            for (String field : fields) {
+        for (String className : classNames) {
+            for (String field : fieldNames) {
                 try {
-                    Class<?> c = Class.forName(cls);
-                    java.lang.reflect.Field f = c.getDeclaredField(field);
+                    Class<?> cls = Class.forName(className);
+                    java.lang.reflect.Field f = cls.getDeclaredField(field);
                     f.setAccessible(true);
                     Object val = f.get(null);
                     if (val instanceof Integer) {
-                        int size = (int) val;
-                        if (size >= 512 * 1024 && size <= 32 * 1024 * 1024) {
-                            MERC_LOG.info("[Mercurizer] Detected Sodium buffer size: {} KB via {}.{}", size / 1024, cls, field);
-                            cachedLargeBufferSize = size;
-                            return size;
-                        }
+                        int size = (Integer) val;
+                        if (size >= 512 * 1024 && size <= 32 * 1024 * 1024) return size;
                     }
                 } catch (Exception ignored) {}
             }
         }
-        MERC_LOG.warn("[Mercurizer] Could not detect Sodium buffer size via reflection — using fallback {} MB", LARGE_SIZE_DEFAULT / (1024 * 1024));
-        cachedLargeBufferSize = LARGE_SIZE_DEFAULT;
-        return LARGE_SIZE_DEFAULT;
+        return 4 * 1024 * 1024;
     }
 
-    private void fill(ByteBuffer buf) {
-        for (int i = 0; i < buf.capacity(); i++) buf.put((byte) (i & 0xFF));
-        buf.flip();
+    private static String sizeLabel(int size) {
+        if (size >= 1024 * 1024) return String.format("%.0f MB", size / (1024.0 * 1024.0));
+        return String.format("%d KB", size / 1024);
     }
 
-    private void draw(GuiGraphics g, float progress, String msg, String sub) {
-        // #11: semi-transparent overlay (not solid black) so parent renders through
-        g.fill(0, 0, this.width, this.height, 0xBB000000);
-        int bw = 320, bh = 8, bx = (this.width - bw) / 2, by = this.height / 2 - 4;
-        g.fill(bx - 1, by - 1, bx + bw + 1, by + bh + 1, 0xFF555555);
-        g.fill(bx, by, bx + bw, by + bh, 0xFF222222);
-        if (progress > 0f)
-            g.fill(bx, by, bx + Math.max(0, Math.min(bw, (int) (bw * progress))), by + bh, 0xFF55FF55);
-        g.drawCenteredString(this.font, msg,  this.width / 2, by - 16, 0xFFFFFFFF);
-        g.drawCenteredString(this.font, sub,  this.width / 2, by + bh + 8, 0xFF888888);
+    private float sizeProgress(int completedSizes, float sub) {
+        int total = sizeSet != null ? sizeSet.length : 3;
+        float perSize = 0.75f / (total + 1);
+        return 0.15f + completedSizes * perSize + sub * perSize;
+    }
+
+    // --- CPU thread ---
+
+    private void startCpuThread() {
+        cpuMOps = -1;
+        cpuThread = new Thread(() -> {
+            int[] blocks   = new int[CPU_ARRAY_SIZE];
+            int[] vertices = new int[CPU_ARRAY_SIZE];
+            for (int i = 0; i < CPU_ARRAY_SIZE; i++) blocks[i] = i * 1664525 + 1013904223;
+            for (int w = 0; w < CPU_WARMUP; w++) processCpu(blocks, vertices);
+            long[] samples = new long[CPU_RUNS];
+            for (int r = 0; r < CPU_RUNS; r++) {
+                long t = System.nanoTime(); processCpu(blocks, vertices); samples[r] = System.nanoTime() - t;
+            }
+            double mean = trimmedMean(removeSpikesByMedian(samples));
+            cpuCov  = coefficientOfVariation(samples);
+            cpuMOps = mean > 0 ? (CPU_ARRAY_SIZE * 1_000.0) / mean : 1.0;
+        }, "mercurizer-cpu-bench");
+        cpuThread.setDaemon(true);
+        cpuThread.start();
+    }
+
+    // --- Benchmark completion ---
+
+    private void handleBenchmarkDone() {
+        MercurizerBenchmarkResult candidate = computeCandidate();
+        if (candidate.isLowConfidence && attemptNumber < 3) {
+            if (bestAttempt == null || candidate.benchmarkConfidenceScore < bestAttempt.benchmarkConfidenceScore) {
+                bestAttempt = candidate;
+            }
+            attemptNumber++;
+            MERC_LOG.warn("[Mercurizer] High variance (CoV {})  -  re-running attempt {} of 3",
+                    String.format("%.0f%%", candidate.benchmarkConfidenceScore * 100), attemptNumber);
+            resetForRerun();
+        } else {
+            MercurizerBenchmarkResult finalResult = (bestAttempt != null
+                    && bestAttempt.benchmarkConfidenceScore < candidate.benchmarkConfidenceScore)
+                    ? bestAttempt : candidate;
+            acceptResult(finalResult);
+        }
+    }
+
+    private MercurizerBenchmarkResult computeCandidate() {
+        MercurizerCapabilities caps = MercurizerCapabilities.getCached();
+        double largeBw = -1, chunkBw = -1, roundTripNs = 0;
+        double worstCov = cpuCov;
+        if (caps != null && bwResults != null) {
+            largeBw     = bwResults[bwResults.length - 1];
+            chunkBw     = bwResults[0];
+            roundTripNs = trimmedMean(removeSpikesByMedian(latencySamples));
+            for (double c : covResults) worstCov = Math.max(worstCov, c);
+        }
+        boolean lowConf = worstCov > COV_LOW_CONF;
+        int lbSize  = sizeSet != null ? sizeSet[sizeSet.length - 1] : 0;
+        int sbSize  = sizeSet != null ? sizeSet[0] : 0;
+        String renderer = caps != null ? caps.renderer : "Vulkan";
+        String driver   = caps != null ? caps.version  : "Vulkan";
+        return new MercurizerBenchmarkResult(largeBw, chunkBw, cpuMOps,
+                Runtime.getRuntime().availableProcessors(),
+                renderer, driver, System.currentTimeMillis(), false,
+                roundTripNs, worstCov, lowConf, lbSize, sbSize);
+    }
+
+    private void acceptResult(MercurizerBenchmarkResult r) {
+        result = r;
+        MercurizerBenchmarkStore.saveWithHistory(r, Minecraft.getInstance().gameDirectory);
+        MercurizerBenchmarkResult weighted = MercurizerBenchmarkStore.load(Minecraft.getInstance().gameDirectory);
+        MercurizerTuning.apply(weighted != null ? weighted : r);
+        MercurizerTuning.setLatestRaw(r);
+        MercurizerBenchmarkController.markDone();
+        resultSinceNs = System.nanoTime();
+        phase = Phase.RESULT;
+        MERC_LOG.info("[Mercurizer] Benchmark done (attempt {})  -  Chunk: {} MB/s  Region: {} MB/s  CPU: {} MOps/s x {}  CoV: {}{}",
+                attemptNumber,
+                String.format("%.0f", r.smallBufferUploadBandwidthMBps),
+                String.format("%.0f", r.bufferUploadBandwidthMBps),
+                String.format("%.0f", r.cpuThroughputMOpsPerSec),
+                r.availableProcessors,
+                String.format("%.0f%%", r.benchmarkConfidenceScore * 100),
+                r.isLowConfidence ? " [LOW CONFIDENCE]" : "");
+    }
+
+    private void resetForRerun() {
+        MercurizerCapabilities caps = MercurizerCapabilities.getCached();
+        if (caps != null) {
+            savedBinding = GL11.glGetInteger(GL15.GL_ARRAY_BUFFER_BINDING);            allVbos = new int[sizeSet.length];
+            allBufs = new ByteBuffer[sizeSet.length];
+            for (int i = 0; i < sizeSet.length; i++) {
+                allBufs[i] = MemoryUtil.memAlloc(sizeSet[i]);
+                fillBuf(allBufs[i]);
+                allVbos[i] = GL15.glGenBuffers();
+            }
+            bwResults  = new double[sizeSet.length];
+            covResults = new double[sizeSet.length];
+        }
+        sizeIndex = 0;
+        currentSamples.clear();
+        rampIdx = 0; latencyIdx = 0;
+        startCpuThread();
+        advance(caps != null ? Phase.RAMP_UP : Phase.CPU_WAIT);
     }
 
     @Override
     public boolean shouldCloseOnEsc() { return false; }
+
+    // --- Plateau detection ---
+
+    private boolean isPlateaued() {
+        if (rampIdx < RAMP_SAMPLES) return false;
+        float[] last = new float[PLATEAU_WIN];
+        for (int i = 0; i < PLATEAU_WIN; i++) last[i] = rampBw[(rampIdx - PLATEAU_WIN + i) % RAMP_SAMPLES];
+        float avg = 0; for (float v : last) avg += v; avg /= PLATEAU_WIN;
+        for (float v : last) if (Math.abs(v - avg) / avg > PLATEAU_TOL) return false;
+        return true;
+    }
+
+    // --- Draw ---
+
+    private void draw(GuiGraphics g, String msg, String sub, float progress) {
+        g.fill(0, 0, this.width, this.height, 0xBB000000);
+        int barW = 320, barH = 8;
+        int barX = (this.width - barW) / 2;
+        int barY = this.height / 2 - 4;
+        g.fill(barX - 1, barY - 1, barX + barW + 1, barY + barH + 1, 0xFF555555);
+        g.fill(barX, barY, barX + barW, barY + barH, 0xFF222222);
+        if (progress > 0f) {
+            int fill = Math.max(0, Math.min(barW, (int)(barW * progress)));
+            g.fill(barX, barY, barX + fill, barY + barH, 0xFF55FF55);
+        }
+        g.drawCenteredString(this.font, msg, this.width / 2, barY - 16, 0xFFFFFFFF);
+        if (sub != null && !sub.isEmpty())
+            g.drawCenteredString(this.font, sub, this.width / 2, barY + barH + 8, 0xFF888888);
+    }
+
+    // --- CoV helpers ---
+
+    private double currentCov() {
+        if (currentSamples.size() < 2) return 1.0;
+        return coefficientOfVariation(toLongArray(currentSamples));
+    }
+
+    private static long[] toLongArray(List<Long> list) {
+        long[] a = new long[list.size()];
+        for (int i = 0; i < a.length; i++) a[i] = list.get(i);
+        return a;
+    }
+
+    // --- Statistics helpers ---
+
+    private static double bwFromNs(long[] samples, int size) {
+        double mean = trimmedMean(removeSpikesByMedian(samples));
+        return mean > 0 ? (size * 1e9) / (mean * 1024.0 * 1024.0) : 1.0;
+    }
+
+    private static long[] removeSpikesByMedian(long[] s) {
+        long[] sorted = Arrays.copyOf(s, s.length); Arrays.sort(sorted);
+        long median = sorted[sorted.length / 2];
+        long threshold = (long)(median * SPIKE_FACTOR);
+        int valid = 0; for (long v : s) if (v > 0 && v <= threshold) valid++;
+        if (valid == 0) return s;
+        long[] out = new long[valid]; int idx = 0;
+        for (long v : s) if (v > 0 && v <= threshold) out[idx++] = v;
+        return out;
+    }
+
+    private static double trimmedMean(long[] s) {
+        long[] sorted = Arrays.copyOf(s, s.length); Arrays.sort(sorted);
+        int lo = (int)Math.floor(sorted.length * TRIM);
+        int hi = sorted.length - lo;
+        if (hi <= lo) return sorted[sorted.length / 2];
+        double sum = 0; for (int i = lo; i < hi; i++) sum += sorted[i];
+        return sum / (hi - lo);
+    }
+
+    private static double coefficientOfVariation(long[] raw) {
+        long[] clean = removeSpikesByMedian(raw);
+        long[] sorted = Arrays.copyOf(clean, clean.length); Arrays.sort(sorted);
+        int lo = (int)Math.floor(sorted.length * TRIM);
+        int hi = sorted.length - lo;
+        if (hi <= lo) return 0;
+        double sum = 0; for (int i = lo; i < hi; i++) sum += sorted[i];
+        double mean = sum / (hi - lo); if (mean <= 0) return 0;
+        double varSum = 0; for (int i = lo; i < hi; i++) varSum += Math.pow(sorted[i] - mean, 2);
+        return Math.sqrt(varSum / (hi - lo)) / mean;
+    }
+
+    private static void processCpu(int[] blocks, int[] vertices) {
+        for (int i = 0; i < blocks.length; i++) {
+            int b     = blocks[i];
+            int state = (b >>> 4) & 0xFFF;
+            int vis   = Integer.bitCount(b & 0x3F);
+            int x = i & 0xF, y = (i >> 4) & 0xF, z = (i >> 8) & 0xF;
+            vertices[i] = (x << 20) | (y << 10) | z | (state << 1) | vis;
+            blocks[i]   = (b * 1664525 + 1013904223) & 0x7FFFFFFF;
+        }
+    }
+
+    private static void fillBuf(ByteBuffer buf) {
+        for (int i = 0; i < buf.capacity(); i++) buf.put((byte)(i & 0xFF));
+        buf.flip();
+    }
 }
