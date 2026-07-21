@@ -18,7 +18,8 @@ public final class MercurizerFrameTracker {
     private static final long[] frameTimes    = new long[WINDOW_SIZE];
     private static int          frameIndex    = 0;
     private static int          frameCount    = 0;
-    private static long         lastFrameNs   = -1;
+    private static long         lastFrameNs      = -1;
+    private static volatile long recoveryUntilNs = 0;
 
     // Refinement window state
     static volatile long  stableStartNs     = -1;
@@ -33,12 +34,19 @@ public final class MercurizerFrameTracker {
             frameTimes[frameIndex % WINDOW_SIZE] = dt;
             frameIndex++;
             if (frameCount < WINDOW_SIZE) frameCount++;
+            if (frameCount >= WINDOW_SIZE / 2 && dt > getRecentMeanFrameTimeNs() * 2.0) {
+                recoveryUntilNs = now + 2_000_000_000L;
+            }
         }
         lastFrameNs = now;
     }
 
     public static long getUploadBudgetNs() { return uploadBudgetNs; }
-    public static float getUploadFraction() { return uploadFraction; }
+    public static float getUploadFraction() {
+        if (System.nanoTime() < recoveryUntilNs) return uploadFraction * 0.50f;
+        return uploadFraction;
+    }
+    public static boolean isStable() { return frameCount >= WINDOW_SIZE; }
 
     public static void onUploadComplete(long uploadNs, long targetFrameNs) {
         long budget = uploadBudgetNs;

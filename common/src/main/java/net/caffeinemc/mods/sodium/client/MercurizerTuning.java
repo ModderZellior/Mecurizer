@@ -26,7 +26,13 @@ public final class MercurizerTuning {
     public static float getBaseUploadFraction() { return baseUploadFraction; }
     public static long  getBaseMinUploadBudgetNs() { return baseMinUploadBudgetNs; }
     public static long  getTextureAnimThresholdNs() { return Long.MAX_VALUE; }
-    public static float getUploadFraction() { return MercurizerFrameTracker.getUploadFraction(); }
+    public static float getUploadFraction() {
+        float f = MercurizerFrameTracker.getUploadFraction();
+        try {
+            if (Boolean.TRUE.equals(Minecraft.getInstance().options.enableVsync().get())) f *= 0.80f;
+        } catch (Exception ignored) {}
+        return f;
+    }
     public static long  getMinUploadBudgetNs() { return MercurizerFrameTracker.getUploadBudgetNs(); }
 
     public static void apply(MercurizerBenchmarkResult result, File gameDirectory) {
@@ -53,15 +59,17 @@ public final class MercurizerTuning {
             uploadBudgetNs    = 3_000_000L;
             minUploadBudgetNs = 500_000L;
         } else {
-            double effectiveBw = Math.min(largeBw, smallBw * 1.5);
-            uploadFraction = (float) Math.min(0.50f, Math.max(0.10f, effectiveBw / 10_000.0));
+            // uploadFraction based on region (large-buffer) bandwidth — GPU capacity
+            uploadFraction = (float) Math.min(0.50f, Math.max(0.10f, largeBw / 10_000.0));
             double cpuScore = Math.min(1.0, cpuMOps / 1000.0) * Math.min(cores, 8) / 4.0;
             uploadFraction = Math.min(0.50f, uploadFraction * (float)(0.7 + cpuScore * 0.3));
 
-            double targetMs = 2.0;
-            if (smallBw > 0) targetMs = Math.max(1.0, Math.min(4.0, 128.0 / smallBw * 1000.0));
-            uploadBudgetNs    = (long)(targetMs * 1_000_000.0);
-            minUploadBudgetNs = 300_000L;
+            // uploadBudgetNs based on chunk (128KB) bandwidth — actual per-upload cost
+            long chunkTimeNs = smallBw > 0
+                    ? (long)(131_072_000.0 / smallBw)
+                    : 2_000_000L;
+            uploadBudgetNs    = Math.max(1_000_000L, Math.min(4_000_000L, chunkTimeNs * 6));
+            minUploadBudgetNs = Math.max(300_000L, chunkTimeNs);
         }
 
         // Round-trip latency floor
@@ -74,6 +82,10 @@ public final class MercurizerTuning {
             }
         }
 
+        if (result.isLowConfidence) {
+            MercurizerCapabilities caps = MercurizerCapabilities.getCached();
+            if (caps != null) uploadFraction *= MercurizerGpuProfiles.getMultiplier(caps.renderer);
+        }
         baseUploadFraction    = uploadFraction;
         baseMinUploadBudgetNs = minUploadBudgetNs;
         MercurizerFrameTracker.configure(uploadBudgetNs, uploadFraction, minUploadBudgetNs);
@@ -86,6 +98,7 @@ public final class MercurizerTuning {
     public static void checkRefinement(File gameDirectory) {
         MercurizerBenchmarkResult lastResult = MercurizerTuning.lastResult;
         if (lastResult == null) return;
+        if (!MercurizerFrameTracker.isStable()) return;
 
         float uploadFraction = MercurizerFrameTracker.getUploadFraction();
         long  uploadBudgetNs = MercurizerFrameTracker.getUploadBudgetNs();
