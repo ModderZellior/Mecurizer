@@ -30,6 +30,10 @@ public final class MercurizerTuning {
 
         double cpuNorm = Math.max(0.5, Math.min(1.75, cpuMOps / 800.0));
         uploadFraction = (float) Math.max(0.02, Math.min(0.07, 0.04 * cpuNorm));
+        if (result.isLowConfidence) {
+            MercurizerCapabilities caps = MercurizerCapabilities.getCached();
+            if (caps != null) uploadFraction *= MercurizerGpuProfiles.getMultiplier(caps.renderer);
+        }
 
         long oneChunkNs = (long)(131_072_000.0 / chunkBw);
         minUploadBudgetNs = Math.max(150_000L, Math.min(1_000_000L, oneChunkNs));
@@ -122,7 +126,13 @@ public final class MercurizerTuning {
     public static void setLatestRaw(MercurizerBenchmarkResult r) { latestRaw = r; }
     public static MercurizerBenchmarkResult getLatestRaw()       { return latestRaw != null ? latestRaw : lastResult; }
 
-    public static float getUploadFraction()                  { return MercurizerFrameTracker.getDynamicUploadFraction(uploadFraction); }
+    public static float getUploadFraction() {
+        float f = MercurizerFrameTracker.getDynamicUploadFraction(uploadFraction);
+        try {
+            if (Boolean.TRUE.equals(Minecraft.getInstance().options.enableVsync().get())) f *= 0.80f;
+        } catch (Exception ignored) {}
+        return f;
+    }
     public static long  getMinUploadBudgetNs()               { return MercurizerFrameTracker.getDynamicMinBudgetNs(minUploadBudgetNs); }
     public static float getBaseUploadFraction()              { return uploadFraction; }
     public static long  getBaseMinUploadBudgetNs()           { return minUploadBudgetNs; }

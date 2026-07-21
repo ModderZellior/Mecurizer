@@ -30,7 +30,7 @@ public class SodiumDebugEntryMixin {
                 displayer.addToGroup(group, "VRAM: " + caps.totalVramMb + " MB");
             }
             if (caps.isIntegratedGpu()) {
-                displayer.addToGroup(group, "WARNING: Running on integrated GPU — see Mercurizer settings");
+                displayer.addToGroup(group, "WARNING: Running on integrated GPU - see Mercurizer settings");
             }
         }
         if (result != null) {
@@ -40,9 +40,19 @@ public class SodiumDebugEntryMixin {
                     result.cpuThroughputMOpsPerSec, result.availableProcessors));
             displayer.addToGroup(group, "Benchmark: " + (result.isRefined ? "Refined" : "Synthetic"));
         }
-        displayer.addToGroup(group, String.format("Upload budget: %.0f%% frame / min %.2f ms",
-                MercurizerTuning.getUploadFraction() * 100,
-                MercurizerTuning.getMinUploadBudgetNs() / 1_000_000.0));
+        float liveFraction = MercurizerTuning.getUploadFraction();
+        float baseFraction = MercurizerTuning.getBaseUploadFraction();
+        long  liveBudget   = MercurizerTuning.getMinUploadBudgetNs();
+        long  baseBudget   = MercurizerTuning.getBaseMinUploadBudgetNs();
+        boolean dynamicActive = Math.abs(liveFraction - baseFraction) > 0.005f
+                             || Math.abs(liveBudget - baseBudget) > 100_000L;
+        if (dynamicActive) {
+            displayer.addToGroup(group, String.format("Upload: base %.1f%% -> live %.1f%% (adapting) / budget %.2f ms",
+                    baseFraction * 100, liveFraction * 100, liveBudget / 1_000_000.0));
+        } else {
+            displayer.addToGroup(group, String.format("Upload: %.1f%% frame / budget %.2f ms",
+                    baseFraction * 100, liveBudget / 1_000_000.0));
+        }
         if (caps != null) {
             String exts = (caps.hasDirectStateAccess ? "DSA " : "") +
                           (caps.hasBufferStorage ? "BufStore " : "") +

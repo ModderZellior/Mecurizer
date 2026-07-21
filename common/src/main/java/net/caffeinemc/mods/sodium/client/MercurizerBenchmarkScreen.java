@@ -187,7 +187,7 @@ public class MercurizerBenchmarkScreen extends Screen {
                 double cov = currentCov();
                 boolean covOk  = currentSamples.size() >= MIN_SAMPLES && cov <= TARGET_COV;
                 boolean maxHit = currentSamples.size() >= MAX_SAMPLES;
-                int phaseNum = 2 + si, totalPhases = sizeSet.length + 2;                draw(graphics,
+                draw(graphics,
                         String.format("Mercurizer  -  measuring %s...", sizeLabel(sizeSet[si])),
                         String.format("%s: %d samples, CoV %.0f%%%s",
                                 sizeLabel(sizeSet[si]), currentSamples.size(), cov * 100, ""),
