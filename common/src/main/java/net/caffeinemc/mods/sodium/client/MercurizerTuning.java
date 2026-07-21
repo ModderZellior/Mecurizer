@@ -13,7 +13,9 @@ public final class MercurizerTuning {
     private static volatile float uploadFraction         = 0.04f;
     private static volatile long  minUploadBudgetNs      = 500_000L;
     private static volatile long  textureAnimThresholdNs = Long.MAX_VALUE;
+    // lastResult holds the weighted-average result that was applied to tuning
     private static volatile MercurizerBenchmarkResult lastResult;
+    // latestRaw holds the most recent single-session result for display
     private static volatile MercurizerBenchmarkResult latestRaw;
 
     private MercurizerTuning() {}
@@ -21,15 +23,22 @@ public final class MercurizerTuning {
     public static void apply(MercurizerBenchmarkResult result) {
         lastResult = result;
 
-        double gpuBw   = result.bufferUploadBandwidthMBps > 0 ? Math.max(result.bufferUploadBandwidthMBps, 50.0) : 500.0;
+        double chunkBw = result.smallBufferUploadBandwidthMBps > 0 ? result.smallBufferUploadBandwidthMBps
+                       : (result.bufferUploadBandwidthMBps > 0 ? result.bufferUploadBandwidthMBps : 500.0);
+        chunkBw = Math.max(chunkBw, 50.0);
         double cpuMOps = Math.max(result.cpuThroughputMOpsPerSec, 50.0);
 
         double cpuNorm = Math.max(0.5, Math.min(1.75, cpuMOps / 800.0));
         uploadFraction = (float) Math.max(0.02, Math.min(0.07, 0.04 * cpuNorm));
+        if (result.isLowConfidence) {
+            MercurizerCapabilities caps = MercurizerCapabilities.getCached();
+            if (caps != null) uploadFraction *= MercurizerGpuProfiles.getMultiplier(caps.renderer);
+        }
 
-        long oneChunkNs = (long) ((128_000.0 / (gpuBw * 1_048_576.0)) * 1_000_000_000.0);
-        minUploadBudgetNs = Math.max(150_000L, Math.min(800_000L, oneChunkNs));
+        long oneChunkNs = (long)(131_072_000.0 / chunkBw);
+        minUploadBudgetNs = Math.max(150_000L, Math.min(1_000_000L, oneChunkNs));
 
+        // Floor at 2× round-trip latency, scaled to 128KB chunk size
         if (result.smallBufferRoundTripNs > 0 && result.smallBufferSizeBytes > 0) {
             double scaledNs = result.smallBufferRoundTripNs * (128_000.0 / result.smallBufferSizeBytes);
             long roundTripFloor = (long) (scaledNs * 2.0);
@@ -61,9 +70,9 @@ public final class MercurizerTuning {
         LOGGER.info("[Mercurizer]   Min upload budget: Sodium default {} ms -> Mercurizer {} ms",
                 String.format("%.1f", SODIUM_DEFAULT_MIN_BUDGET_NS / 1_000_000.0),
                 String.format("%.3f", minUploadBudgetNs / 1_000_000.0));
-        LOGGER.info("[Mercurizer]   Texture anim throttle: {}  (GPU: {} MB/s, CPU: {} MOps/s)",
+        LOGGER.info("[Mercurizer]   Texture anim throttle: {}  (Chunk: {} MB/s, CPU: {} MOps/s)",
                 texThrottleDesc,
-                String.format("%.0f", result.bufferUploadBandwidthMBps),
+                String.format("%.0f", chunkBw),
                 String.format("%.0f", result.cpuThroughputMOpsPerSec));
         if (result.isLowConfidence) {
             LOGGER.warn("[Mercurizer]   Low-confidence benchmark (CoV {}) — tuning may be suboptimal",
@@ -78,6 +87,7 @@ public final class MercurizerTuning {
         long  refinedBudget   = MercurizerFrameTracker.getRefinedBudgetNs();
         if (refinedFraction <= 0 || refinedBudget <= 0) return;
 
+        // Thermal throttle detection — skip refinement if fraction dropped >30% below current
         if (refinedFraction < uploadFraction * 0.70f) {
             LOGGER.warn("[Mercurizer] Refinement skipped — refined fraction ({}) is >30% below benchmark ({}) — possible thermal throttle",
                     String.format("%.2f%%", refinedFraction * 100),
@@ -116,7 +126,13 @@ public final class MercurizerTuning {
     public static void setLatestRaw(MercurizerBenchmarkResult r) { latestRaw = r; }
     public static MercurizerBenchmarkResult getLatestRaw()       { return latestRaw != null ? latestRaw : lastResult; }
 
-    public static float getUploadFraction()                  { return MercurizerFrameTracker.getDynamicUploadFraction(uploadFraction); }
+    public static float getUploadFraction() {
+        float f = MercurizerFrameTracker.getDynamicUploadFraction(uploadFraction);
+        try {
+            if (Boolean.TRUE.equals(Minecraft.getInstance().options.enableVsync().get())) f *= 0.80f;
+        } catch (Exception ignored) {}
+        return f;
+    }
     public static long  getMinUploadBudgetNs()               { return MercurizerFrameTracker.getDynamicMinBudgetNs(minUploadBudgetNs); }
     public static float getBaseUploadFraction()              { return uploadFraction; }
     public static long  getBaseMinUploadBudgetNs()           { return minUploadBudgetNs; }

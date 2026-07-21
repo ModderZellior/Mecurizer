@@ -16,8 +16,9 @@ public final class MercurizerFrameTracker {
     private static double  stableBudgetSum    = 0;
     private static long    stableSamples      = 0;
 
-    private static float currentFraction = -1;
-    private static long  currentBudget   = -1;
+    private static float currentFraction    = -1;
+    private static long  currentBudget      = -1;
+    private static volatile long recoveryUntilNs = 0;
 
     private MercurizerFrameTracker() {}
 
@@ -31,6 +32,10 @@ public final class MercurizerFrameTracker {
             bestFrameNs = frameNs;
         } else {
             bestFrameNs = (long) (bestFrameNs * 0.9999 + frameNs * 0.0001);
+        }
+
+        if (count == WINDOW && frameNs > smoothed() * 2) {
+            recoveryUntilNs = System.nanoTime() + 2_000_000_000L;
         }
 
         if (!refinedThisSession && count == WINDOW) {
@@ -111,6 +116,7 @@ public final class MercurizerFrameTracker {
         } else {
             currentFraction += (ideal - currentFraction) * 0.02f;
         }
+        if (System.nanoTime() < recoveryUntilNs) return Math.min(currentFraction, base * 0.50f);
         return currentFraction;
     }
 
