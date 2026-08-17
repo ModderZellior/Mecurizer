@@ -62,9 +62,6 @@ public class MercurizerIGpuWarningScreen extends Screen {
         return caps.isIntegratedGpu();
     }
 
-    public static void markShown() {
-        shownThisSession = true;
-    }
 
     private static boolean isNoDgpuFlagged() {
         return new File(Minecraft.getInstance().gameDirectory, FLAG_FILE).exists();

@@ -9,21 +9,20 @@ import org.slf4j.LoggerFactory;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
-/** Offline (non-screen) benchmark runner. Used for headless / test paths. */
 public final class MercurizerBenchmark {
     private static final Logger LOGGER = LoggerFactory.getLogger("Mercurizer");
 
-    private static final int LARGE_SIZE   = 4 * 1024 * 1024;
-    private static final int SMALL_SIZE   = 1 * 1024 * 1024;
+    private static final int LARGE_SIZE = 4 * 1024 * 1024;
+    private static final int SMALL_SIZE = 1 * 1024 * 1024;
     private static final int LARGE_WARMUP = 12;
-    private static final int LARGE_RUNS   = 30;
+    private static final int LARGE_RUNS = 30;
     private static final int SMALL_WARMUP = 12;
-    private static final int SMALL_RUNS   = 30;
+    private static final int SMALL_RUNS = 30;
     private static final int LATENCY_RUNS = 20;
     private static final int CPU_ARRAY_SIZE = 1024 * 1024;
-    private static final int CPU_WARMUP     = 10;
-    private static final int CPU_RUNS       = 25;
-    private static final double TRIM        = 0.15;
+    private static final int CPU_WARMUP = 10;
+    private static final int CPU_RUNS = 25;
+    private static final double TRIM = 0.15;
     private static final double SPIKE_FACTOR = 3.0;
     private static final double COV_LOW_CONFIDENCE = 0.20;
 
@@ -157,7 +156,7 @@ public final class MercurizerBenchmark {
         return meanNs > 0 ? (bufferSize * 1e9) / (meanNs * 1024.0 * 1024.0) : 1.0;
     }
 
-    private static long[] removeSpikesByMedian(long[] samples) {
+    static long[] removeSpikesByMedian(long[] samples) {
         long[] sorted = Arrays.copyOf(samples, samples.length);
         Arrays.sort(sorted);
         long median = sorted[sorted.length / 2];
@@ -170,7 +169,7 @@ public final class MercurizerBenchmark {
         return out;
     }
 
-    private static double trimmedMean(long[] samples) {
+    static double trimmedMean(long[] samples) {
         long[] sorted = Arrays.copyOf(samples, samples.length);
         Arrays.sort(sorted);
         int lo = (int) Math.floor(sorted.length * TRIM);
@@ -181,7 +180,7 @@ public final class MercurizerBenchmark {
         return sum / (hi - lo);
     }
 
-    private static double coefficientOfVariation(long[] raw) {
+    static double coefficientOfVariation(long[] raw) {
         long[] clean  = removeSpikesByMedian(raw);
         long[] sorted = Arrays.copyOf(clean, clean.length);
         Arrays.sort(sorted);

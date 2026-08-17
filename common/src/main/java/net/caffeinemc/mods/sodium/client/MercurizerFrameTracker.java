@@ -1,23 +1,23 @@
 package net.caffeinemc.mods.sodium.client;
 
 public final class MercurizerFrameTracker {
-    private static final int    WINDOW             = 16;
-    private static final long   STABLE_DURATION_NS = 30_000_000_000L;
-    private static final double STABLE_VARIANCE     = 0.50;
+    private static final int WINDOW = 16;
+    private static final long STABLE_DURATION_NS = 30_000_000_000L;
+    private static final double STABLE_VARIANCE = 0.50;
 
-    private static final long[] frames  = new long[WINDOW];
-    private static int  index           = 0;
-    private static int  count           = 0;
-    private static long bestFrameNs     = Long.MAX_VALUE;
+    private static final long[] frames = new long[WINDOW];
+    private static int index = 0;
+    private static int count = 0;
+    private static long bestFrameNs = Long.MAX_VALUE;
 
-    private static long   stableStartNs      = -1;
+    private static long stableStartNs = -1;
     private static boolean refinedThisSession = false;
-    private static double  stableFractionSum  = 0;
-    private static double  stableBudgetSum    = 0;
-    private static long    stableSamples      = 0;
+    private static double stableFractionSum = 0;
+    private static double stableBudgetSum = 0;
+    private static long stableSamples = 0;
 
-    private static float currentFraction    = -1;
-    private static long  currentBudget      = -1;
+    private static float currentFraction = -1;
+    private static long currentBudget = -1;
     private static volatile long recoveryUntilNs = 0;
 
     private MercurizerFrameTracker() {}
