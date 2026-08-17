@@ -6,26 +6,25 @@ import org.slf4j.LoggerFactory;
 public final class MercurizerFrameTracker {
     private static final Logger LOGGER = LoggerFactory.getLogger("Mercurizer");
 
-    private static volatile long   uploadBudgetNs   = 2_000_000L;
-    private static volatile float  uploadFraction   = 0.25f;
-    private static volatile long   minUploadBudgetNs = 500_000L;
+    private static volatile long uploadBudgetNs = 2_000_000L;
+    private static volatile float uploadFraction = 0.25f;
+    private static volatile long minUploadBudgetNs = 500_000L;
 
-    private static final int   WINDOW_SIZE   = 60;
-    private static final float SCALE_UP      = 1.08f;
-    private static final float SCALE_DOWN    = 0.88f;
+    private static final int WINDOW_SIZE = 60;
+    private static final float SCALE_UP = 1.08f;
+    private static final float SCALE_DOWN = 0.88f;
     private static final float TARGET_MARGIN = 0.90f;
 
-    private static final long[] frameTimes    = new long[WINDOW_SIZE];
-    private static int          frameIndex    = 0;
-    private static int          frameCount    = 0;
-    private static long         lastFrameNs      = -1;
+    private static final long[] frameTimes = new long[WINDOW_SIZE];
+    private static int frameIndex = 0;
+    private static int frameCount = 0;
+    private static long lastFrameNs = -1;
     private static volatile long recoveryUntilNs = 0;
 
-    // Refinement window state
-    static volatile long  stableStartNs     = -1;
+    static volatile long stableStartNs = -1;
     static volatile float stableFractionSum = 0;
-    static volatile float stableBudgetSum   = 0;
-    static volatile int   stableSamples     = 0;
+    static volatile float stableBudgetSum = 0;
+    static volatile int stableSamples = 0;
 
     public static void onFrameStart() {
         long now = System.nanoTime();
@@ -76,17 +75,17 @@ public final class MercurizerFrameTracker {
     }
 
     public static void configure(long budgetNs, float fraction, long minBudgetNs) {
-        uploadBudgetNs   = budgetNs;
-        uploadFraction   = fraction;
+        uploadBudgetNs = budgetNs;
+        uploadFraction = fraction;
         minUploadBudgetNs = minBudgetNs;
         LOGGER.info("[Mercurizer] Upload budget set: {}us, fraction: {}, min: {}us",
                 budgetNs / 1000, fraction, minBudgetNs / 1000);
     }
 
     public static void resetRefinementWindow() {
-        stableStartNs     = -1;
+        stableStartNs = -1;
         stableFractionSum = 0;
-        stableBudgetSum   = 0;
-        stableSamples     = 0;
+        stableBudgetSum = 0;
+        stableSamples = 0;
     }
 }

@@ -18,24 +18,22 @@ import java.util.List;
 public class MercurizerBenchmarkScreen extends Screen {
     private static final Logger MERC_LOG = LoggerFactory.getLogger("Mercurizer");
 
-    private static final int    CHUNK_SIZE    = 128 * 1024;
-    private static final int    WARMUP_FRAMES = 8;
-    private static final int    MIN_SAMPLES   = 10;
-    private static final int    MAX_SAMPLES   = 60;
-    private static final double TARGET_COV    = 0.08;
-    private static final int    RAMP_SAMPLES  = 12;
-    private static final int    LATENCY_RUNS  = 20;
-    private static final int    CPU_ARRAY_SIZE = 1024 * 1024;
-    private static final int    CPU_WARMUP    = 10;
-    private static final int    CPU_RUNS      = 25;
-    private static final double TRIM          = 0.15;
-    private static final double SPIKE_FACTOR  = 3.0;
-    private static final double COV_LOW_CONF  = 0.20;
-    private static final long   LINGER_NS     = 60_000_000L;
-    private static final long   RESULT_NS     = 3_000_000_000L;
+    private static final int CHUNK_SIZE = 128 * 1024;
+    private static final int WARMUP_FRAMES = 8;
+    private static final int MIN_SAMPLES = 10;
+    private static final int MAX_SAMPLES = 60;
+    private static final double TARGET_COV = 0.08;
+    private static final int RAMP_SAMPLES = 12;
+    private static final int LATENCY_RUNS = 20;
+    private static final int CPU_ARRAY_SIZE = 1024 * 1024;
+    private static final int CPU_WARMUP = 10;
+    private static final int CPU_RUNS = 25;
+    private static final double COV_LOW_CONF = 0.20;
+    private static final long LINGER_NS = 60_000_000L;
+    private static final long RESULT_NS = 3_000_000_000L;
 
     private static final float PLATEAU_TOL = 0.05f;
-    private static final int   PLATEAU_WIN = 3;
+    private static final int PLATEAU_WIN = 3;
 
     private enum Phase {
         LINGER, INIT, RAMP_UP,
@@ -47,37 +45,31 @@ public class MercurizerBenchmarkScreen extends Screen {
     private Phase phase = Phase.LINGER;
     private long lingerStartNs = -1;
 
-    // Multi-size
-    private int[]        sizeSet;
-    private int          sizeIndex;
-    private int[]        allVbos;
+    private int[] sizeSet;
+    private int sizeIndex;
+    private int[] allVbos;
     private ByteBuffer[] allBufs;
-    private int          savedBinding;
-    private double[]     bwResults;
-    private double[]     covResults;
+    private int savedBinding;
+    private double[] bwResults;
+    private double[] covResults;
 
-    // Adaptive sampling
     private final List<Long> currentSamples = new ArrayList<>();
     private int frameCounter;
 
-    // Ramp-up
-    private final float[] rampBw  = new float[RAMP_SAMPLES];
-    private int           rampIdx;
+    private final float[] rampBw = new float[RAMP_SAMPLES];
+    private int rampIdx;
 
-    // Latency
     private final long[] latencySamples = new long[LATENCY_RUNS];
-    private int          latencyIdx;
+    private int latencyIdx;
 
-    // CPU benchmark
-    private volatile Thread  cpuThread = null;
-    private volatile double  cpuMOps   = 0;
-    private volatile double  cpuCov    = 0;
-    private volatile boolean cpuDone   = false;
+    private volatile Thread cpuThread = null;
+    private volatile double cpuMOps = 0;
+    private volatile double cpuCov = 0;
+    private volatile boolean cpuDone = false;
 
-    // Result + re-run
     private MercurizerBenchmarkResult result = null;
     private long resultSinceNs = -1;
-    private int  attemptNumber = 1;
+    private int attemptNumber = 1;
     private MercurizerBenchmarkResult bestAttempt = null;
 
     static volatile int cachedLargeBufferSize = -1;
@@ -196,8 +188,8 @@ public class MercurizerBenchmarkScreen extends Screen {
                         sizeProgress(si, Math.min(1f, currentSamples.size() / (float)MAX_SAMPLES)));
                 if (covOk || maxHit) {
                     long[] arr = toLongArray(currentSamples);
-                    bwResults[si]  = bwFromNs(arr, sizeSet[si]);
-                    covResults[si] = coefficientOfVariation(arr);
+                    bwResults[si] = bwFromNs(arr, sizeSet[si]);
+                    covResults[si] = MercurizerBenchmark.coefficientOfVariation(arr);
                     sizeIndex++;
                     if (sizeIndex < sizeSet.length) {
                         phase = Phase.WARMUP_SIZE;
@@ -249,7 +241,7 @@ public class MercurizerBenchmarkScreen extends Screen {
         }
     }
 
-    // --- GL helpers ---
+
 
     private long measureUpload(ByteBuffer buf) {
         long t0 = System.nanoTime();
@@ -270,8 +262,6 @@ public class MercurizerBenchmarkScreen extends Screen {
         GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, savedBinding);
         phase = Phase.CPU_WAIT;
     }
-
-    // --- Size set ---
 
     private void buildSizeSet(MercurizerCapabilities caps, int largeSize) {
         if (caps == null) { sizeSet = new int[]{ CHUNK_SIZE }; return; }
@@ -321,8 +311,6 @@ public class MercurizerBenchmarkScreen extends Screen {
         return 0.15f + completedSizes * perSize + sub * perSize;
     }
 
-    // --- CPU thread ---
-
     private void startCpuThread() {
         cpuThread = new Thread(() -> {
             int[] blocks   = new int[CPU_ARRAY_SIZE];
@@ -333,16 +321,14 @@ public class MercurizerBenchmarkScreen extends Screen {
             for (int r = 0; r < CPU_RUNS; r++) {
                 long t = System.nanoTime(); processCpu(blocks, vertices); samples[r] = System.nanoTime() - t;
             }
-            double mean = trimmedMean(removeSpikesByMedian(samples));
+            double mean = MercurizerBenchmark.trimmedMean(MercurizerBenchmark.removeSpikesByMedian(samples));
             cpuMOps = mean > 0 ? (CPU_ARRAY_SIZE * 1_000.0) / mean : 1.0;
-            cpuCov  = coefficientOfVariation(samples);
+            cpuCov = MercurizerBenchmark.coefficientOfVariation(samples);
             cpuDone = true;
         }, "mercurizer-cpu-bench");
         cpuThread.setDaemon(true);
         cpuThread.start();
     }
-
-    // --- Benchmark completion ---
 
     private void handleBenchmarkDone() {
         MercurizerBenchmarkResult candidate = computeCandidate();
@@ -369,7 +355,7 @@ public class MercurizerBenchmarkScreen extends Screen {
         if (caps != null && bwResults != null) {
             largeBw     = bwResults[bwResults.length - 1];
             chunkBw     = bwResults[0];
-            roundTripNs = trimmedMean(removeSpikesByMedian(latencySamples));
+            roundTripNs = MercurizerBenchmark.trimmedMean(MercurizerBenchmark.removeSpikesByMedian(latencySamples));
             for (double c : covResults) worstCov = Math.max(worstCov, c);
         }
         boolean lowConf = worstCov > COV_LOW_CONF;
@@ -430,8 +416,6 @@ public class MercurizerBenchmarkScreen extends Screen {
     @Override
     public boolean shouldCloseOnEsc() { return false; }
 
-    // --- Plateau detection ---
-
     private boolean isPlateaued() {
         if (rampIdx < RAMP_SAMPLES) return false;
         float[] last = new float[PLATEAU_WIN];
@@ -440,8 +424,6 @@ public class MercurizerBenchmarkScreen extends Screen {
         for (float v : last) if (Math.abs(v - avg) / avg > PLATEAU_TOL) return false;
         return true;
     }
-
-    // --- Draw ---
 
     private void draw(GuiGraphicsExtractor graphics, String msg, String sub, float progress) {
         int barW = 320, barH = 8;
@@ -458,11 +440,9 @@ public class MercurizerBenchmarkScreen extends Screen {
             graphics.centeredText(this.font, sub, this.width / 2, barY + barH + 8, 0xFF888888);
     }
 
-    // --- CoV helpers ---
-
     private double currentCov() {
         if (currentSamples.size() < 2) return 1.0;
-        return coefficientOfVariation(toLongArray(currentSamples));
+        return MercurizerBenchmark.coefficientOfVariation(toLongArray(currentSamples));
     }
 
     private static long[] toLongArray(List<Long> list) {
@@ -471,43 +451,9 @@ public class MercurizerBenchmarkScreen extends Screen {
         return a;
     }
 
-    // --- Statistics helpers ---
-
     private static double bwFromNs(long[] samples, int size) {
-        double mean = trimmedMean(removeSpikesByMedian(samples));
+        double mean = MercurizerBenchmark.trimmedMean(MercurizerBenchmark.removeSpikesByMedian(samples));
         return mean > 0 ? (size * 1e9) / (mean * 1024.0 * 1024.0) : 1.0;
-    }
-
-    private static long[] removeSpikesByMedian(long[] s) {
-        long[] sorted = Arrays.copyOf(s, s.length); Arrays.sort(sorted);
-        long median = sorted[sorted.length / 2];
-        long threshold = (long)(median * SPIKE_FACTOR);
-        int valid = 0; for (long v : s) if (v > 0 && v <= threshold) valid++;
-        if (valid == 0) return s;
-        long[] out = new long[valid]; int idx = 0;
-        for (long v : s) if (v > 0 && v <= threshold) out[idx++] = v;
-        return out;
-    }
-
-    private static double trimmedMean(long[] s) {
-        long[] sorted = Arrays.copyOf(s, s.length); Arrays.sort(sorted);
-        int lo = (int)Math.floor(sorted.length * TRIM);
-        int hi = sorted.length - lo;
-        if (hi <= lo) return sorted[sorted.length / 2];
-        double sum = 0; for (int i = lo; i < hi; i++) sum += sorted[i];
-        return sum / (hi - lo);
-    }
-
-    private static double coefficientOfVariation(long[] raw) {
-        long[] clean = removeSpikesByMedian(raw);
-        long[] sorted = Arrays.copyOf(clean, clean.length); Arrays.sort(sorted);
-        int lo = (int)Math.floor(sorted.length * TRIM);
-        int hi = sorted.length - lo;
-        if (hi <= lo) return 0;
-        double sum = 0; for (int i = lo; i < hi; i++) sum += sorted[i];
-        double mean = sum / (hi - lo); if (mean <= 0) return 0;
-        double varSum = 0; for (int i = lo; i < hi; i++) varSum += Math.pow(sorted[i] - mean, 2);
-        return Math.sqrt(varSum / (hi - lo)) / mean;
     }
 
     private static void processCpu(int[] blocks, int[] vertices) {

@@ -10,16 +10,21 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class MercurizerBenchmarkStore {
-    private static final Logger LOGGER   = LoggerFactory.getLogger("Mercurizer");
-    private static final String DIR      = "mercurizer";
-    private static final String FILE     = "benchmark.json";
-    private static final int    MAX_HISTORY = 3;
-    private static final Gson   GSON     = new GsonBuilder().setPrettyPrinting().create();
+    private static final Logger LOGGER = LoggerFactory.getLogger("Mercurizer");
+    private static final String DIR = "mercurizer";
+    private static volatile String activeFile = "benchmark.json";
+
+    public static void setActiveRenderer(boolean isVulkan) {
+        activeFile = isVulkan ? "vulkan-benchmark.json" : "opengl-benchmark.json";
+    }
+    private static final int MAX_HISTORY = 3;
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     private static final double[] WEIGHTS = { 0.5, 0.3, 0.2 };
 
     private static class HistoryWrapper {
         List<MercurizerBenchmarkResult> history = new ArrayList<>();
+        int gameStartCount = 0;
     }
 
     public static boolean needsBenchmark(MercurizerCapabilities caps, File gameDirectory) {
@@ -31,20 +36,17 @@ public final class MercurizerBenchmarkStore {
     }
 
     public static void saveWithHistory(MercurizerBenchmarkResult result, File gameDirectory) {
-        List<MercurizerBenchmarkResult> history = loadHistory(gameDirectory);
-        history.add(0, result);
-        if (history.size() > MAX_HISTORY) history = history.subList(0, MAX_HISTORY);
-        writeHistory(history, gameDirectory);
+        HistoryWrapper w = loadWrapper(gameDirectory);
+        w.history.add(0, result);
+        if (w.history.size() > MAX_HISTORY) w.history = new ArrayList<>(w.history.subList(0, MAX_HISTORY));
+        writeWrapper(w, gameDirectory);
     }
 
     public static void updateLatestRefined(MercurizerBenchmarkResult refined, File gameDirectory) {
-        List<MercurizerBenchmarkResult> history = loadHistory(gameDirectory);
-        if (!history.isEmpty()) {
-            history.set(0, refined);
-        } else {
-            history.add(refined);
-        }
-        writeHistory(history, gameDirectory);
+        HistoryWrapper w = loadWrapper(gameDirectory);
+        if (!w.history.isEmpty()) w.history.set(0, refined);
+        else w.history.add(refined);
+        writeWrapper(w, gameDirectory);
     }
 
     public static void save(MercurizerBenchmarkResult result, File gameDirectory) {
@@ -63,29 +65,44 @@ public final class MercurizerBenchmarkStore {
     }
 
     public static List<MercurizerBenchmarkResult> loadHistory(File gameDirectory) {
-        File file = new File(new File(gameDirectory, DIR), FILE);
-        if (!file.exists()) return new ArrayList<>();
-        try (Reader reader = new FileReader(file)) {
-            HistoryWrapper wrapper = GSON.fromJson(reader, HistoryWrapper.class);
-            if (wrapper != null && wrapper.history != null && !wrapper.history.isEmpty()) {
-                return new ArrayList<>(wrapper.history);
-            }
-        } catch (Exception e) {
-            LOGGER.warn("[Mercurizer] Could not read benchmark.json — will re-run benchmark: {}", e.getMessage());
-        }
-        return new ArrayList<>();
+        return new ArrayList<>(loadWrapper(gameDirectory).history);
     }
 
-    private static void writeHistory(List<MercurizerBenchmarkResult> history, File gameDirectory) {
+    public static int loadGameStartCount(File gameDirectory) {
+        return loadWrapper(gameDirectory).gameStartCount;
+    }
+
+    public static void incrementGameStartCount(File gameDirectory) {
+        HistoryWrapper w = loadWrapper(gameDirectory);
+        w.gameStartCount++;
+        writeWrapper(w, gameDirectory);
+    }
+
+    public static void resetStartupSequence(File gameDirectory) {
+        writeWrapper(new HistoryWrapper(), gameDirectory);
+    }
+
+    private static HistoryWrapper loadWrapper(File gameDirectory) {
+        File file = new File(new File(gameDirectory, DIR), activeFile);
+        if (!file.exists()) return new HistoryWrapper();
+        try (Reader reader = new FileReader(file)) {
+            HistoryWrapper w = GSON.fromJson(reader, HistoryWrapper.class);
+            if (w == null) return new HistoryWrapper();
+            if (w.history == null) w.history = new ArrayList<>();
+            return w;
+        } catch (Exception e) {
+            LOGGER.warn("[Mercurizer] Could not read benchmark.json — will re-run benchmark: {}", e.getMessage());
+            return new HistoryWrapper();
+        }
+    }
+
+    private static void writeWrapper(HistoryWrapper wrapper, File gameDirectory) {
         File dir = new File(gameDirectory, DIR);
         if (!dir.exists() && !dir.mkdirs()) {
             LOGGER.warn("[Mercurizer] Could not create directory: {}", dir);
             return;
         }
-        File file = new File(dir, FILE);
-        HistoryWrapper wrapper = new HistoryWrapper();
-        wrapper.history = history;
-        try (Writer writer = new FileWriter(file)) {
+        try (Writer writer = new FileWriter(new File(dir, activeFile))) {
             GSON.toJson(wrapper, writer);
         } catch (IOException e) {
             LOGGER.warn("[Mercurizer] Could not save benchmark results: {}", e.getMessage());
@@ -118,8 +135,8 @@ public final class MercurizerBenchmarkStore {
             }
         }
 
-        double finalLargeBw   = largeBwWeightSum   > 0 ? largeBw   / largeBwWeightSum   : -1;
-        double finalSmallBw   = smallBwWeightSum   > 0 ? smallBw   / smallBwWeightSum   : -1;
+        double finalLargeBw = largeBwWeightSum > 0 ? largeBw / largeBwWeightSum : -1;
+        double finalSmallBw = smallBwWeightSum > 0 ? smallBw / smallBwWeightSum : -1;
         double finalRoundTrip = roundTripWeightSum > 0 ? roundTripNs / roundTripWeightSum : 0;
 
         MercurizerBenchmarkResult latest = history.get(0);

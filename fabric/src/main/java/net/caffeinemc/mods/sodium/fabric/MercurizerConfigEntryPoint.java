@@ -25,7 +25,6 @@ public class MercurizerConfigEntryPoint implements ConfigEntryPoint {
         var page = builder.createOptionPage()
                 .setName(Component.literal("Mercurizer"));
 
-        // Hardware group
         var hardwareGroup = builder.createOptionGroup()
                 .setName(Component.literal("Hardware"));
 
@@ -40,12 +39,12 @@ public class MercurizerConfigEntryPoint implements ConfigEntryPoint {
             addLabel(builder, hardwareGroup, "GPU type: " + (caps.isIntegratedGpu() ? "Integrated — for best performance, switch to your dedicated GPU" : "Dedicated"));
 
             StringBuilder capStr = new StringBuilder();
-            if (caps.hasDirectStateAccess)   capStr.append("DSA ");
-            if (caps.hasBufferStorage)       capStr.append("BufStore ");
-            if (caps.hasMultiDrawIndirect)   capStr.append("MDI ");
-            if (caps.hasTimerQuery)          capStr.append("Timer ");
-            if (caps.hasS3tcCompression)     capStr.append("S3TC ");
-            if (caps.hasRgtcCompression)     capStr.append("RGTC ");
+            if (caps.hasDirectStateAccess) capStr.append("DSA ");
+            if (caps.hasBufferStorage) capStr.append("BufStore ");
+            if (caps.hasMultiDrawIndirect) capStr.append("MDI ");
+            if (caps.hasTimerQuery) capStr.append("Timer ");
+            if (caps.hasS3tcCompression) capStr.append("S3TC ");
+            if (caps.hasRgtcCompression) capStr.append("RGTC ");
             if (capStr.length() > 0) {
                 addLabel(builder, hardwareGroup, "Caps: " + capStr.toString().strip());
             }
@@ -55,7 +54,6 @@ public class MercurizerConfigEntryPoint implements ConfigEntryPoint {
 
         page.addOptionGroup(hardwareGroup);
 
-        // Benchmark group
         var benchmarkGroup = builder.createOptionGroup()
                 .setName(Component.literal("Benchmark"));
 
@@ -82,7 +80,6 @@ public class MercurizerConfigEntryPoint implements ConfigEntryPoint {
 
         page.addOptionGroup(benchmarkGroup);
 
-        // Active tuning group
         var tuningGroup = builder.createOptionGroup()
                 .setName(Component.literal("Active Tuning"));
 
@@ -96,7 +93,6 @@ public class MercurizerConfigEntryPoint implements ConfigEntryPoint {
 
         page.addOptionGroup(tuningGroup);
 
-        // Optimisation status group
         var statusGroup = builder.createOptionGroup()
                 .setName(Component.literal("Optimisation Status"));
 
