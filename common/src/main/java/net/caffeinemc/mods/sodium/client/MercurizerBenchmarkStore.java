@@ -45,10 +45,6 @@ public final class MercurizerBenchmarkStore {
         writeWrapper(w, gameDirectory);
     }
 
-    public static void save(MercurizerBenchmarkResult result, File gameDirectory) {
-        saveWithHistory(result, gameDirectory);
-    }
-
     public static MercurizerBenchmarkResult load(File gameDirectory) {
         List<MercurizerBenchmarkResult> history = loadHistory(gameDirectory);
         if (history.isEmpty()) return null;

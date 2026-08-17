@@ -13,7 +13,7 @@ public final class MercurizerBenchmark {
     private static final Logger LOGGER = LoggerFactory.getLogger("Mercurizer");
 
     private static final int LARGE_SIZE = 4 * 1024 * 1024;
-    private static final int SMALL_SIZE = 1 * 1024 * 1024;
+    private static final int SMALL_SIZE = 1024 * 1024;
     private static final int LARGE_WARMUP = 12;
     private static final int LARGE_RUNS = 30;
     private static final int SMALL_WARMUP = 12;
@@ -139,7 +139,7 @@ public final class MercurizerBenchmark {
         return new double[]{ meanNs > 0 ? (CPU_ARRAY_SIZE * 1_000.0) / meanNs : 1.0, cov };
     }
 
-    private static long processCpuData(int[] blocks, int[] vertices) {
+    private static void processCpuData(int[] blocks, int[] vertices) {
         for (int i = 0; i < blocks.length; i++) {
             int block   = blocks[i];
             int state   = (block >>> 4) & 0xFFF;
@@ -148,7 +148,6 @@ public final class MercurizerBenchmark {
             vertices[i] = (x << 20) | (y << 10) | z | (state << 1) | visible;
             blocks[i]   = (block * 1664525 + 1013904223) & 0x7FFFFFFF;
         }
-        return blocks.length;
     }
 
     private static double bandwidthFromSamples(long[] samples, int bufferSize) {
