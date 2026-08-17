@@ -33,7 +33,7 @@ public abstract class MercurizerPauseScreenMixin extends Screen {
                 .filter(c -> c instanceof AbstractWidget w && w.getWidth() == 98 && w.getHeight() == 20)
                 .mapToInt(c -> ((AbstractWidget) c).getY())
                 .max();
-        int btnY  = optionsRowY.orElse(this.height / 4 + 78);
+        int btnY = optionsRowY.orElse(this.height / 4 + 78);
         int leftX = this.children().stream()
                 .filter(c -> c instanceof AbstractWidget w && w.getWidth() == 98 && w.getHeight() == 20 && w.getY() == btnY)
                 .mapToInt(c -> ((AbstractWidget) c).getX())

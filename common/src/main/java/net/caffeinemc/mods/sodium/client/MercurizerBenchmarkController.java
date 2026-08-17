@@ -52,7 +52,7 @@ public final class MercurizerBenchmarkController {
             startupRunNumber = count + 1;
             // Apply existing results so game is tuned while benchmarking
             MercurizerBenchmarkResult weighted = MercurizerBenchmarkStore.load(mc.gameDirectory);
-            MercurizerBenchmarkResult latest   = MercurizerBenchmarkStore.loadLatest(mc.gameDirectory);
+            MercurizerBenchmarkResult latest = MercurizerBenchmarkStore.loadLatest(mc.gameDirectory);
             if (weighted != null || latest != null) {
                 MercurizerTuning.apply(weighted != null ? weighted : latest);
                 MercurizerTuning.setLatestRaw(latest != null ? latest : weighted);

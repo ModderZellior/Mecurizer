@@ -10,11 +10,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class MercurizerBenchmarkStore {
-    private static final Logger LOGGER   = LoggerFactory.getLogger("Mercurizer");
-    private static final String DIR      = "mercurizer";
-    private static final String FILE     = "benchmark.json";
-    private static final int    MAX_HISTORY = 3;
-    private static final Gson   GSON     = new GsonBuilder().setPrettyPrinting().create();
+    private static final Logger LOGGER = LoggerFactory.getLogger("Mercurizer");
+    private static final String DIR = "mercurizer";
+    private static final String FILE = "benchmark.json";
+    private static final int MAX_HISTORY = 3;
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     private static final double[] WEIGHTS = { 0.5, 0.3, 0.2 };
 
@@ -74,7 +74,6 @@ public final class MercurizerBenchmarkStore {
         writeWrapper(w, gameDirectory);
     }
 
-    /** Resets gameStartCount to 0 and clears history (called when GPU/driver changes). */
     public static void resetStartupSequence(File gameDirectory) {
         writeWrapper(new HistoryWrapper(), gameDirectory);
     }
@@ -132,8 +131,8 @@ public final class MercurizerBenchmarkStore {
             }
         }
 
-        double finalLargeBw   = largeBwWeightSum   > 0 ? largeBw   / largeBwWeightSum   : -1;
-        double finalSmallBw   = smallBwWeightSum   > 0 ? smallBw   / smallBwWeightSum   : -1;
+        double finalLargeBw = largeBwWeightSum > 0 ? largeBw / largeBwWeightSum : -1;
+        double finalSmallBw = smallBwWeightSum > 0 ? smallBw / smallBwWeightSum : -1;
         double finalRoundTrip = roundTripWeightSum > 0 ? roundTripNs / roundTripWeightSum : 0;
 
         MercurizerBenchmarkResult latest = history.get(0);
