@@ -7,9 +7,6 @@ import org.slf4j.LoggerFactory;
 public final class MercurizerTuning {
     private static final Logger LOGGER = LoggerFactory.getLogger("Mercurizer");
 
-    private static final float SODIUM_DEFAULT_UPLOAD_FRACTION = 0.1f;
-    private static final long SODIUM_DEFAULT_MIN_BUDGET_NS = 2_000_000L;
-
     private static volatile float uploadFraction = 0.04f;
     private static volatile long minUploadBudgetNs = 500_000L;
     private static volatile long textureAnimThresholdNs = Long.MAX_VALUE;
@@ -62,11 +59,9 @@ public final class MercurizerTuning {
 
         String source = result.isRefined ? "refined" : "synthetic";
         LOGGER.info("[Mercurizer] Tuning applied from {} benchmark results:", source);
-        LOGGER.info("[Mercurizer]   Upload fraction:  Sodium default {}% -> Mercurizer {}%",
-                String.format("%.0f", SODIUM_DEFAULT_UPLOAD_FRACTION * 100),
+        LOGGER.info("[Mercurizer]   Upload fraction:  Sodium default 10% -> Mercurizer {}%",
                 String.format("%.1f", uploadFraction * 100));
-        LOGGER.info("[Mercurizer]   Min upload budget: Sodium default {} ms -> Mercurizer {} ms",
-                String.format("%.1f", SODIUM_DEFAULT_MIN_BUDGET_NS / 1_000_000.0),
+        LOGGER.info("[Mercurizer]   Min upload budget: Sodium default 2.0 ms -> Mercurizer {} ms",
                 String.format("%.3f", minUploadBudgetNs / 1_000_000.0));
         LOGGER.info("[Mercurizer]   Texture anim throttle: {}  (Chunk: {} MB/s, CPU: {} MOps/s)",
                 texThrottleDesc,
