@@ -25,7 +25,7 @@ dependencies {
     compileOnly("net.fabricmc:sponge-mixin:0.13.2+mixin.0.8.5")
     compileOnly("net.fabricmc:fabric-loader:${BuildConfig.FABRIC_LOADER_VERSION}")
 
-    modCompileOnly(files(rootProject.file("libs/sodium-fabric-0.8.14-beta.1+mc1.21.11.jar")))
+    modCompileOnly(files(rootProject.file("libs/sodium-fabric-${BuildConfig.SODIUM_VERSION}+mc${BuildConfig.MINECRAFT_VERSION}.jar")))
 }
 
 loom {
