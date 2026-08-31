@@ -20,8 +20,9 @@ public final class MercurizerBenchmarkController {
         File gameDir = mc.gameDirectory;
 
         if (caps == null) {
+            MercurizerVulkanProbe.probe(); // logs device info on first call
             MercurizerBenchmarkResult latest = MercurizerBenchmarkStore.loadLatest(gameDir);
-            if (latest != null && "Vulkan".equals(latest.rendererAtBenchmarkTime)) {
+            if (latest != null && "Vulkan".equals(latest.driverVersionAtBenchmarkTime)) {
                 int count = MercurizerBenchmarkStore.loadGameStartCount(gameDir);
                 if (count < 3) {
                     MercurizerBenchmarkStore.incrementGameStartCount(gameDir);

@@ -72,7 +72,16 @@ public class MercurizerInfoScreen extends Screen {
             if (caps.totalVramMb > 0) lines.add("VRAM: " + caps.totalVramMb + " MB");
             lines.add("Type: " + (caps.isIntegratedGpu() ? "Integrated GPU" : "Dedicated GPU"));
         } else {
-            lines.add("Hardware info unavailable (Vulkan backend)");
+            MercurizerVulkanDeviceInfo vkInfo = MercurizerVulkanProbe.probe();
+            if (vkInfo != null) {
+                lines.add("GPU: " + vkInfo.deviceName);
+                lines.add("Backend: Vulkan");
+                if (vkInfo.vramMb > 0) lines.add("VRAM: " + vkInfo.vramMb + " MB");
+                lines.add("Type: " + (vkInfo.isIntegrated ? "Integrated GPU" : "Dedicated GPU"));
+            } else {
+                lines.add("Backend: Vulkan");
+                lines.add("GPU info unavailable");
+            }
         }
 
         lines.add("");
@@ -101,12 +110,19 @@ public class MercurizerInfoScreen extends Screen {
 
         lines.add("");
         lines.add("§Active Tuning");
-        lines.add(String.format("Upload fraction: %.1f%%", MercurizerFrameTracker.getUploadFraction() * 100));
-        lines.add(String.format("Upload budget: %.3f ms", MercurizerFrameTracker.getUploadBudgetNs() / 1_000_000.0));
+        lines.add(String.format("Upload fraction: %.1f%%", MercurizerTuning.getBaseUploadFraction() * 100));
+        lines.add(String.format("Min upload budget: %.3f ms", MercurizerTuning.getBaseMinUploadBudgetNs() / 1_000_000.0));
+        long texThresh = MercurizerTuning.getTextureAnimThresholdNs();
+        lines.add("Texture animation: " + (texThresh == Long.MAX_VALUE
+                ? "Always on" : String.format("%.0f ms threshold", texThresh / 1_000_000.0)));
 
         lines.add("");
-        lines.add("§Status");
+        lines.add("§Optimisation Status");
+        boolean safePath = MercurizerRuntimePolicy.preferSafeStagingPath();
+        lines.add("Safe staging path: " + (safePath ? "Active" : "Inactive"));
+        lines.add("RGSS: " + (safePath ? "Disabled (safe staging active)" : "Active"));
         lines.add("Dynamic upload scaling: Active");
+        lines.add("Texture animation throttle: Active");
         if (result != null) {
             lines.add("Adaptive refinement: " + (result.isRefined ? "Complete" : "Pending (play 2 min in stable scene)"));
         }

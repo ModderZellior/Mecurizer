@@ -42,12 +42,12 @@ public class RenderSectionManagerMixin {
         }
     }
 
-    @ModifyConstant(method = "updateChunks", constant = @Constant(floatValue = 0.1f, ordinal = 0))
+    @ModifyConstant(method = "updateChunks", constant = @Constant(floatValue = 0.3f, ordinal = 0))
     private float modifyUploadFraction(float ignored) {
         return MercurizerTuning.getUploadFraction();
     }
 
-    @ModifyConstant(method = "updateChunks", constant = @Constant(longValue = 2_000_000L, ordinal = 0))
+    @ModifyConstant(method = "updateChunks", constant = @Constant(longValue = 10_000_000L, ordinal = 0))
     private long modifyMinUploadBudget(long ignored) {
         return MercurizerTuning.getMinUploadBudgetNs();
     }

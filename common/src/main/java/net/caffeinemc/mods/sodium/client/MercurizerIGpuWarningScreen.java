@@ -16,7 +16,7 @@ public class MercurizerIGpuWarningScreen extends Screen {
     private final String[] lines;
 
     private static final String[] MSG_VULKAN = {
-            "Mercurizer could not detect your GPU type (Vulkan backend).",
+            "Mercurizer could not detect your GPU type.",
             "If Minecraft is running on your integrated GPU, go to",
             "Windows Settings > System > Display > Graphics,",
             "find Minecraft or javaw.exe, and set it to High Performance."
@@ -40,10 +40,10 @@ public class MercurizerIGpuWarningScreen extends Screen {
             "then relaunch Minecraft."
     };
 
-    public MercurizerIGpuWarningScreen(Screen returnScreen, boolean vulkanMode) {
-        super(Component.literal(vulkanMode ? "GPU Warning" : "Integrated GPU Detected"));
+    public MercurizerIGpuWarningScreen(Screen returnScreen, MercurizerVulkanDeviceInfo vulkanInfo) {
+        super(Component.literal(vulkanInfo != null ? "Integrated GPU Detected" : "GPU Warning"));
         this.returnScreen = returnScreen;
-        if (vulkanMode) {
+        if (vulkanInfo == null) {
             this.lines = MSG_VULKAN;
         } else {
             String platform = MercurizerCapabilities.getOsPlatform();
@@ -55,11 +55,27 @@ public class MercurizerIGpuWarningScreen extends Screen {
         }
     }
 
-    public static boolean shouldShow(MercurizerCapabilities caps) {
+    public MercurizerIGpuWarningScreen(Screen returnScreen) {
+        super(Component.literal("Integrated GPU Detected"));
+        this.returnScreen = returnScreen;
+        String platform = MercurizerCapabilities.getOsPlatform();
+        this.lines = switch (platform) {
+            case "windows" -> MSG_WINDOWS;
+            case "mac"     -> MSG_MAC;
+            default        -> MSG_LINUX;
+        };
+    }
+
+    public static boolean shouldShow(MercurizerCapabilities caps, MercurizerVulkanDeviceInfo vulkanInfo) {
         if (shownThisSession) return false;
         if (isNoDgpuFlagged()) return false;
-        if (caps == null) return true; // Vulkan backend — show generic warning
-        return caps.isIntegratedGpu();
+        if (caps != null) return caps.isIntegratedGpu();
+        if (vulkanInfo != null) return vulkanInfo.isIntegrated;
+        return true;
+    }
+
+    public static boolean shouldShow(MercurizerCapabilities caps) {
+        return shouldShow(caps, null);
     }
 
 

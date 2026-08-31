@@ -4,6 +4,8 @@ import net.caffeinemc.mods.sodium.client.MercurizerBenchmarkController;
 import net.caffeinemc.mods.sodium.client.MercurizerBenchmarkScreen;
 import net.caffeinemc.mods.sodium.client.MercurizerCapabilities;
 import net.caffeinemc.mods.sodium.client.MercurizerIGpuWarningScreen;
+import net.caffeinemc.mods.sodium.client.MercurizerVulkanDeviceInfo;
+import net.caffeinemc.mods.sodium.client.MercurizerVulkanProbe;
 import net.caffeinemc.mods.sodium.client.MercurizerInfoScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.AbstractWidget;
@@ -21,18 +23,20 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class MercurizerTitleScreenMixin extends Screen {
     protected MercurizerTitleScreenMixin() { super(null); }
 
-    @Inject(method = "init", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "init", at = @At("TAIL"))
     private void checkScreens(CallbackInfo ci) {
         Minecraft mc = Minecraft.getInstance();
         if (MercurizerBenchmarkController.shouldShowBenchmarkScreen(mc)) {
             mc.setScreenAndShow(new MercurizerBenchmarkScreen((Screen) (Object) this));
-            ci.cancel();
             return;
         }
         MercurizerCapabilities caps = MercurizerCapabilities.getCached();
-        if (MercurizerIGpuWarningScreen.shouldShow(caps)) {
-            mc.setScreenAndShow(new MercurizerIGpuWarningScreen((Screen) (Object) this, caps == null));
-            ci.cancel();
+        MercurizerVulkanDeviceInfo vkInfo = caps == null ? MercurizerVulkanProbe.probe() : null;
+        if (MercurizerIGpuWarningScreen.shouldShow(caps, vkInfo)) {
+            Screen screen = caps != null
+                    ? new MercurizerIGpuWarningScreen((Screen) (Object) this)
+                    : new MercurizerIGpuWarningScreen((Screen) (Object) this, vkInfo);
+            mc.setScreenAndShow(screen);
         }
     }
 

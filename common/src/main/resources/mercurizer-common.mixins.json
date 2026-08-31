@@ -12,6 +12,7 @@
     "addon.ResourcePackScannerMixin",
     "addon.SodiumConfigBuilderMixin",
     "addon.SodiumDebugEntryMixin",
+    "addon.MercurizerCameraMixin",
     "addon.MercurizerTitleScreenMixin",
     "addon.MercurizerPauseScreenMixin"
   ]

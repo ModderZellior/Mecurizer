@@ -7,6 +7,7 @@ public final class MercurizerFrameTracker {
     private static final Logger LOGGER = LoggerFactory.getLogger("Mercurizer");
 
     private static volatile long uploadBudgetNs = 2_000_000L;
+    private static volatile long configuredBudgetNs = 2_000_000L;
     private static volatile float uploadFraction = 0.25f;
     private static volatile long minUploadBudgetNs = 500_000L;
 
@@ -23,7 +24,7 @@ public final class MercurizerFrameTracker {
 
     static volatile long stableStartNs = -1;
     static volatile float stableFractionSum = 0;
-    static volatile float stableBudgetSum = 0;
+    static volatile double stableBudgetSum = 0;
     static volatile int stableSamples = 0;
 
     public static void onFrameStart() {
@@ -52,7 +53,7 @@ public final class MercurizerFrameTracker {
         if (uploadNs > targetFrameNs * TARGET_MARGIN) {
             budget = Math.max(minUploadBudgetNs, (long) (budget * SCALE_DOWN));
         } else if (uploadNs < targetFrameNs * TARGET_MARGIN * 0.5f) {
-            budget = (long) (budget * SCALE_UP);
+            budget = Math.min(configuredBudgetNs, (long) (budget * SCALE_UP));
         }
         uploadBudgetNs = budget;
     }
@@ -76,6 +77,7 @@ public final class MercurizerFrameTracker {
 
     public static void configure(long budgetNs, float fraction, long minBudgetNs) {
         uploadBudgetNs = budgetNs;
+        configuredBudgetNs = budgetNs;
         uploadFraction = fraction;
         minUploadBudgetNs = minBudgetNs;
         LOGGER.info("[Mercurizer] Upload budget set: {}us, fraction: {}, min: {}us",

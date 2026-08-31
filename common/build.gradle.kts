@@ -9,6 +9,7 @@ base {
 }
 
 repositories {
+    mavenCentral()
     mavenLocal()
     maven { url = uri("https://api.modrinth.com/maven") }
 }
@@ -22,7 +23,8 @@ dependencies {
     compileOnly("net.fabricmc:sponge-mixin:0.13.2+mixin.0.8.5")
     compileOnly("net.fabricmc:fabric-loader:${BuildConfig.FABRIC_LOADER_VERSION}")
 
-    compileOnly(files(rootProject.file("libs/sodium-fabric-0.9.1+mc${BuildConfig.MINECRAFT_VERSION}.jar")))
+    compileOnly(files(rootProject.file("libs/sodium-fabric-${BuildConfig.SODIUM_VERSION}+mc${BuildConfig.MINECRAFT_VERSION}.jar")))
+    compileOnly("org.lwjgl:lwjgl-vulkan:3.4.1")
 }
 
 loom {

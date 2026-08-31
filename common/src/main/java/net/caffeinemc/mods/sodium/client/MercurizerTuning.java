@@ -19,13 +19,14 @@ public final class MercurizerTuning {
 
     private static volatile float baseUploadFraction = 0.25f;
     private static volatile long baseMinUploadBudgetNs = 500_000L;
+    private static volatile long textureAnimThresholdNs = Long.MAX_VALUE;
 
     public static void setLatestRaw(MercurizerBenchmarkResult r) { latestRaw = r; }
     public static MercurizerBenchmarkResult getLatestRaw() { return latestRaw; }
     public static MercurizerBenchmarkResult getLastResult() { return lastResult; }
     public static float getBaseUploadFraction() { return baseUploadFraction; }
     public static long getBaseMinUploadBudgetNs() { return baseMinUploadBudgetNs; }
-    public static long getTextureAnimThresholdNs() { return Long.MAX_VALUE; }
+    public static long getTextureAnimThresholdNs() { return textureAnimThresholdNs; }
     public static float getUploadFraction() {
         float f = MercurizerFrameTracker.getUploadFraction();
         Minecraft mc = Minecraft.getInstance();
@@ -81,8 +82,21 @@ public final class MercurizerTuning {
 
         if (result.isLowConfidence) {
             MercurizerCapabilities caps = MercurizerCapabilities.getCached();
-            if (caps != null) uploadFraction *= gpuMultiplier(caps.renderer);
+            if (caps != null) {
+                uploadFraction *= gpuMultiplier(caps.renderer);
+            } else {
+                MercurizerVulkanDeviceInfo vkInfo = MercurizerVulkanProbe.probe();
+                if (vkInfo != null) uploadFraction *= gpuMultiplier(vkInfo.deviceName);
+            }
         }
+        if (cpuMOps >= 900.0) {
+            textureAnimThresholdNs = Long.MAX_VALUE;
+        } else if (cpuMOps >= 450.0) {
+            textureAnimThresholdNs = 22_000_000L;
+        } else {
+            textureAnimThresholdNs = 16_000_000L;
+        }
+
         baseUploadFraction = uploadFraction;
         baseMinUploadBudgetNs = minUploadBudgetNs;
         MercurizerFrameTracker.configure(uploadBudgetNs, uploadFraction, minUploadBudgetNs);

@@ -66,6 +66,12 @@ public class MercurizerBenchmarkScreen extends Screen {
     private volatile double cpuMOps = 0;
     private volatile double cpuCov = 0;
     private volatile boolean cpuDone = false;
+    private volatile boolean dismissed = false;
+
+    private volatile double vkLargeBw = -1;
+    private volatile double vkSmallBw = -1;
+    private volatile double vkRoundTripNs = 0;
+    private volatile double vkCov = 0;
 
     private MercurizerBenchmarkResult result = null;
     private long resultSinceNs = -1;
@@ -81,13 +87,12 @@ public class MercurizerBenchmarkScreen extends Screen {
 
     @Override
     public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
-        if (parent != null) parent.extractBackground(graphics, mouseX, mouseY, delta);
+        graphics.fill(0, 0, this.width, this.height, 0xFF101010);
     }
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
-        if (parent != null) parent.extractRenderState(graphics, -999, -999, delta);
-        graphics.fill(0, 0, this.width, this.height, 0xBB000000);
+        graphics.fill(0, 0, this.width, this.height, 0xFF101010);
 
         long now = System.nanoTime();
 
@@ -104,7 +109,7 @@ public class MercurizerBenchmarkScreen extends Screen {
             case INIT -> {
                 MercurizerCapabilities caps = MercurizerCapabilities.probeAndCache();
                 if (caps == null) {
-                    startCpuThread();
+                    startVulkanThread();
                     phase = Phase.CPU_WAIT;
                     break;
                 }
@@ -217,14 +222,25 @@ public class MercurizerBenchmarkScreen extends Screen {
                 }
             }
             case CPU_WAIT -> {
+                MercurizerCapabilities capsForWait = MercurizerCapabilities.getCached();
+                String cpuMsg = capsForWait == null
+                        ? "Mercurizer  -  running Vulkan + CPU benchmark..."
+                        : "Mercurizer  -  waiting for CPU benchmark...";
                 String cpuSub = attemptNumber > 1
                         ? String.format("High variance  -  re-running (attempt %d of 3)...", attemptNumber)
-                        : "Waiting for CPU benchmark...";
-                draw(graphics, "Mercurizer  -  waiting for CPU benchmark...", cpuSub, 0.90f);
+                        : "";
+                draw(graphics, cpuMsg, cpuSub, 0.90f);
                 if (cpuDone) handleBenchmarkDone();
             }
             case RESULT -> {
-                if (result == null) { Minecraft.getInstance().setScreenAndShow(parent); break; }
+                boolean timeout = result == null || now - resultSinceNs >= RESULT_NS;
+                if (timeout && !dismissed) {
+                    dismissed = true;
+                    Minecraft mc = Minecraft.getInstance();
+                    mc.execute(() -> mc.setScreenAndShow(parent));
+                    break;
+                }
+                if (result == null) break;
                 String line1 = result.bufferUploadBandwidthMBps < 0
                         ? String.format("Done.  CPU: %.0f MOps/s x %d cores",
                                 result.cpuThroughputMOpsPerSec, result.availableProcessors)
@@ -236,7 +252,6 @@ public class MercurizerBenchmarkScreen extends Screen {
                         MercurizerFrameTracker.getUploadBudgetNs() / 1_000_000.0,
                         result.isLowConfidence ? "  [LOW CONFIDENCE]" : "");
                 draw(graphics, line1, line2, 1f);
-                if (now - resultSinceNs >= RESULT_NS) Minecraft.getInstance().setScreenAndShow(parent);
             }
         }
     }
@@ -330,6 +345,32 @@ public class MercurizerBenchmarkScreen extends Screen {
         cpuThread.start();
     }
 
+    private void startVulkanThread() {
+        cpuThread = new Thread(() -> {
+            double[] vkResult = MercurizerVulkanBenchmark.run();
+            if (vkResult != null) {
+                vkLargeBw     = vkResult[0];
+                vkSmallBw     = vkResult[1];
+                vkRoundTripNs = vkResult[2];
+                vkCov         = vkResult[3];
+            }
+            int[] blocks   = new int[CPU_ARRAY_SIZE];
+            int[] vertices = new int[CPU_ARRAY_SIZE];
+            for (int i = 0; i < CPU_ARRAY_SIZE; i++) blocks[i] = i * 1664525 + 1013904223;
+            for (int w = 0; w < CPU_WARMUP; w++) processCpu(blocks, vertices);
+            long[] samples = new long[CPU_RUNS];
+            for (int r = 0; r < CPU_RUNS; r++) {
+                long t = System.nanoTime(); processCpu(blocks, vertices); samples[r] = System.nanoTime() - t;
+            }
+            double mean = MercurizerBenchmark.trimmedMean(MercurizerBenchmark.removeSpikesByMedian(samples));
+            cpuMOps = mean > 0 ? (CPU_ARRAY_SIZE * 1_000.0) / mean : 1.0;
+            cpuCov  = MercurizerBenchmark.coefficientOfVariation(samples);
+            cpuDone = true;
+        }, "mercurizer-vk-bench");
+        cpuThread.setDaemon(true);
+        cpuThread.start();
+    }
+
     private void handleBenchmarkDone() {
         MercurizerBenchmarkResult candidate = computeCandidate();
         if (candidate.isLowConfidence && attemptNumber < 3) {
@@ -357,11 +398,17 @@ public class MercurizerBenchmarkScreen extends Screen {
             chunkBw     = bwResults[0];
             roundTripNs = MercurizerBenchmark.trimmedMean(MercurizerBenchmark.removeSpikesByMedian(latencySamples));
             for (double c : covResults) worstCov = Math.max(worstCov, c);
+        } else if (caps == null && vkLargeBw > 0) {
+            largeBw     = vkLargeBw;
+            chunkBw     = vkSmallBw;
+            roundTripNs = vkRoundTripNs;
+            worstCov    = Math.max(cpuCov, vkCov);
         }
         boolean lowConf = worstCov > COV_LOW_CONF;
         int lbSize  = sizeSet != null ? sizeSet[sizeSet.length - 1] : 0;
         int sbSize  = sizeSet != null ? sizeSet[0] : 0;
-        String renderer = caps != null ? caps.renderer : "Vulkan";
+        MercurizerVulkanDeviceInfo vkInfo = caps == null ? MercurizerVulkanProbe.probe() : null;
+        String renderer = caps != null ? caps.renderer : (vkInfo != null ? vkInfo.deviceName : "Vulkan");
         String driver   = caps != null ? caps.version  : "Vulkan";
         return new MercurizerBenchmarkResult(largeBw, chunkBw, cpuMOps,
                 Runtime.getRuntime().availableProcessors(),
@@ -374,14 +421,23 @@ public class MercurizerBenchmarkScreen extends Screen {
         MercurizerBenchmarkController.onBenchmarkComplete(r);
         resultSinceNs = System.nanoTime();
         phase = Phase.RESULT;
-        MERC_LOG.info("[Mercurizer] Benchmark done (attempt {})  -  Chunk: {} MB/s  Region: {} MB/s  CPU: {} MOps/s x {}  CoV: {}{}",
-                attemptNumber,
-                String.format("%.0f", r.smallBufferUploadBandwidthMBps),
-                String.format("%.0f", r.bufferUploadBandwidthMBps),
-                String.format("%.0f", r.cpuThroughputMOpsPerSec),
-                r.availableProcessors,
-                String.format("%.0f%%", r.benchmarkConfidenceScore * 100),
-                r.isLowConfidence ? " [LOW CONFIDENCE]" : "");
+        if (r.bufferUploadBandwidthMBps < 0) {
+            MERC_LOG.info("[Mercurizer] Benchmark done (attempt {})  -  CPU: {} MOps/s x {}  CoV: {}{}",
+                    attemptNumber,
+                    String.format("%.0f", r.cpuThroughputMOpsPerSec),
+                    r.availableProcessors,
+                    String.format("%.0f%%", r.benchmarkConfidenceScore * 100),
+                    r.isLowConfidence ? " [LOW CONFIDENCE]" : "");
+        } else {
+            MERC_LOG.info("[Mercurizer] Benchmark done (attempt {})  -  Chunk: {} MB/s  Region: {} MB/s  CPU: {} MOps/s x {}  CoV: {}{}",
+                    attemptNumber,
+                    String.format("%.0f", r.smallBufferUploadBandwidthMBps),
+                    String.format("%.0f", r.bufferUploadBandwidthMBps),
+                    String.format("%.0f", r.cpuThroughputMOpsPerSec),
+                    r.availableProcessors,
+                    String.format("%.0f%%", r.benchmarkConfidenceScore * 100),
+                    r.isLowConfidence ? " [LOW CONFIDENCE]" : "");
+        }
     }
 
     private void resetForRerun() {
@@ -405,9 +461,15 @@ public class MercurizerBenchmarkScreen extends Screen {
         rampIdx      = 0;
         latencyIdx   = 0;
         cpuDone = false; cpuMOps = 0; cpuCov = 0;
+        vkLargeBw = -1; vkSmallBw = -1; vkRoundTripNs = 0; vkCov = 0;
         cpuThread = null;
-        startCpuThread();
-        phase = caps != null ? Phase.RAMP_UP : Phase.CPU_WAIT;
+        if (caps != null) {
+            startCpuThread();
+            phase = Phase.RAMP_UP;
+        } else {
+            startVulkanThread();
+            phase = Phase.CPU_WAIT;
+        }
     }
 
     @Override

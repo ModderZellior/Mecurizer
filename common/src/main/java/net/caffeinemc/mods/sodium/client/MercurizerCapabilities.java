@@ -100,6 +100,13 @@ public final class MercurizerCapabilities {
             if (r.contains("rx vega")) return false;
             return true;
         }
+        // older GCN APUs report their Mesa codename in the renderer string
+        if (r.contains("kaveri") || r.contains("godavari") || r.contains("carrizo")
+                || r.contains("stoney") || r.contains("beema") || r.contains("mullins") || r.contains("kabini")) return true;
+        // Ryzen iGPUs (Raven Ridge onward, including Steam Deck vangogh)
+        if (r.contains("raven") || r.contains("picasso") || r.contains("renoir")
+                || r.contains("lucienne") || r.contains("cezanne") || r.contains("barcelo")
+                || r.contains("rembrandt") || r.contains("raphael") || r.contains("phoenix") || r.contains("vangogh")) return true;
         if (v.contains("apple")) return true;
         return false;
     }
