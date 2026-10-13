@@ -1,11 +1,12 @@
 ﻿import org.gradle.api.Project
 
 object BuildConfig {
-    val MINECRAFT_VERSION: String = "1.21.11"
-    val SODIUM_VERSION: String = "0.8.14"
+    val MINECRAFT_VERSION: String = "1.21"
+    val SODIUM_VERSION: String = "0.6.13"
+    val SODIUM_MINECRAFT_VERSION: String = "1.21.1"
     val NEOFORGE_VERSION: String = "21.11.42"
     val FABRIC_LOADER_VERSION: String = "0.19.2"
-    val FABRIC_API_VERSION: String = "0.140.0+1.21.11"
+    val FABRIC_API_VERSION: String = "0.102.0+1.21"
     val SUPPORT_FRAPI : Boolean = true
 
     val PARCHMENT_VERSION: String? = null

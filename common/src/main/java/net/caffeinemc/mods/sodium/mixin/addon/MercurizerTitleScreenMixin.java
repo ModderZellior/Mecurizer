@@ -11,7 +11,7 @@ import net.minecraft.client.gui.components.SpriteIconButton;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -41,7 +41,7 @@ public abstract class MercurizerTitleScreenMixin extends Screen {
         Screen self = (Screen) (Object) this;
         SpriteIconButton btn = SpriteIconButton.builder(
                 Component.literal("Mercurizer Settings"), b -> Minecraft.getInstance().setScreen(new MercurizerInfoScreen(self)), true)
-                .sprite(Identifier.fromNamespaceAndPath("mercurizer", "icon/mercurizer"), 15, 15)
+                .sprite(ResourceLocation.fromNamespaceAndPath("mercurizer", "icon/mercurizer"), 15, 15)
                 .size(20, 20)
                 .build();
 

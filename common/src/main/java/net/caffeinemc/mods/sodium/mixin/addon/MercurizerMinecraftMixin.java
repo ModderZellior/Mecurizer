@@ -4,7 +4,6 @@ import it.unimi.dsi.fastutil.longs.LongArrayFIFOQueue;
 import net.caffeinemc.mods.sodium.client.MercurizerRuntimePolicy;
 import net.caffeinemc.mods.sodium.client.SodiumClientMod;
 import net.minecraft.client.Minecraft;
-import net.minecraft.util.profiling.Profiler;
 import net.minecraft.util.profiling.ProfilerFiller;
 import org.lwjgl.opengl.GL32C;
 import org.spongepowered.asm.mixin.Mixin;
@@ -24,7 +23,7 @@ public class MercurizerMinecraftMixin {
             return;
         }
 
-        ProfilerFiller profiler = Profiler.get();
+        ProfilerFiller profiler = Minecraft.getInstance().getProfiler();
         profiler.push("wait_for_gpu");
 
         while (this.fences.size() > MercurizerRuntimePolicy.getEffectiveCpuRenderAheadLimit(SodiumClientMod.options().advanced.cpuRenderAheadLimit)) {

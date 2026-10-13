@@ -35,7 +35,7 @@ dependencies {
 
     modImplementation("net.fabricmc:fabric-loader:${BuildConfig.FABRIC_LOADER_VERSION}")
 
-    modCompileOnly(files(rootProject.file("libs/sodium-fabric-${BuildConfig.SODIUM_VERSION}+mc${BuildConfig.MINECRAFT_VERSION}.jar")))
+    modCompileOnly(files(rootProject.file("libs/sodium-fabric-${BuildConfig.SODIUM_VERSION}+mc${BuildConfig.SODIUM_MINECRAFT_VERSION}.jar")))
 }
 
 loom {
