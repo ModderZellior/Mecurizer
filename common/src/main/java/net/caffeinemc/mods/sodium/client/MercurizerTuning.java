@@ -12,11 +12,22 @@ public final class MercurizerTuning {
     private static volatile long textureAnimThresholdNs = Long.MAX_VALUE;
     private static volatile MercurizerBenchmarkResult lastResult;
     private static volatile MercurizerBenchmarkResult latestRaw;
+    private static volatile MercurizerBenchmarkResult appliedResult;
+    private static volatile float refinedUploadFraction = -1;
+    private static volatile long refinedMinBudgetNs = -1;
 
     private MercurizerTuning() {}
 
-    public static void apply(MercurizerBenchmarkResult result) {
-        lastResult = result;
+    public static void apply(MercurizerBenchmarkResult benchmark) {
+        apply(benchmark, true);
+    }
+
+    private static void apply(MercurizerBenchmarkResult benchmark, boolean announce) {
+        lastResult = benchmark;
+        appliedResult = benchmark;
+        refinedUploadFraction = -1;
+        refinedMinBudgetNs = -1;
+        MercurizerBenchmarkResult result = MercurizerConfig.withMeasurementOverrides(benchmark);
 
         double chunkBw = result.smallBufferUploadBandwidthMBps > 0 ? result.smallBufferUploadBandwidthMBps
                        : (result.bufferUploadBandwidthMBps > 0 ? result.bufferUploadBandwidthMBps : 500.0);
@@ -38,7 +49,7 @@ public final class MercurizerTuning {
             double scaledNs = result.smallBufferRoundTripNs * (128_000.0 / result.smallBufferSizeBytes);
             long roundTripFloor = (long) (scaledNs * 2.0);
             if (roundTripFloor > minUploadBudgetNs) {
-                LOGGER.info("[Mercurizer]   Round-trip floor raised min budget: {} ms -> {} ms",
+                if (announce) LOGGER.info("[Mercurizer]   Round-trip floor raised min budget: {} ms -> {} ms",
                         String.format("%.3f", minUploadBudgetNs / 1_000_000.0),
                         String.format("%.3f", roundTripFloor / 1_000_000.0));
                 minUploadBudgetNs = roundTripFloor;
@@ -57,6 +68,7 @@ public final class MercurizerTuning {
             texThrottleDesc = "16 ms threshold";
         }
 
+        if (!announce) return;
         String source = result.isRefined ? "refined" : "synthetic";
         LOGGER.info("[Mercurizer] Tuning applied from {} benchmark results:", source);
         LOGGER.info("[Mercurizer]   Upload fraction:  Sodium default 10% -> Mercurizer {}%",
@@ -73,7 +85,26 @@ public final class MercurizerTuning {
         }
     }
 
+    public static void reapply() {
+        MercurizerFrameTracker.resetDynamicValues();
+        MercurizerBenchmarkResult benchmark = appliedResult;
+        if (benchmark == null) return;
+        MercurizerBenchmarkResult current = lastResult;
+        float keptFraction = refinedUploadFraction;
+        long keptBudget = refinedMinBudgetNs;
+        apply(benchmark, false);
+        if (keptFraction > 0 && !MercurizerConfig.hasMeasurementOverrides()) {
+            uploadFraction = keptFraction;
+            minUploadBudgetNs = keptBudget;
+            refinedUploadFraction = keptFraction;
+            refinedMinBudgetNs = keptBudget;
+            lastResult = current;
+        }
+    }
+
     public static void checkRefinement() {
+        if (!MercurizerConfig.isEnabled(MercurizerConfig.get().adaptiveRefinement)) return;
+        if (MercurizerConfig.hasMeasurementOverrides()) return;
         if (!MercurizerFrameTracker.isRefinementReady()) return;
         if (lastResult == null) return;
         float refinedFraction = MercurizerFrameTracker.getRefinedFraction();
@@ -106,6 +137,8 @@ public final class MercurizerTuning {
 
         uploadFraction = refinedFraction;
         minUploadBudgetNs = refinedBudget;
+        refinedUploadFraction = refinedFraction;
+        refinedMinBudgetNs = refinedBudget;
         lastResult = refined;
 
         MercurizerBenchmarkStore.updateLatestRefined(refined, Minecraft.getInstance().gameDirectory);
@@ -120,16 +153,48 @@ public final class MercurizerTuning {
     public static MercurizerBenchmarkResult getLatestRaw() { return latestRaw != null ? latestRaw : lastResult; }
 
     public static float getUploadFraction() {
-        float f = MercurizerFrameTracker.getDynamicUploadFraction(uploadFraction);
+        MercurizerConfig.Values config = MercurizerConfig.get();
+        float base = getBaseUploadFraction();
+        float f = MercurizerConfig.isEnabled(config.dynamicUploadScaling)
+                ? MercurizerFrameTracker.getDynamicUploadFraction(base)
+                : base;
+        if (MercurizerConfig.isEnabled(config.antiStutter) && MercurizerFrameTracker.isRecovering()) {
+            f = Math.min(f, base * 0.50f);
+        }
         Minecraft mc = Minecraft.getInstance();
-        if (mc != null && Boolean.TRUE.equals(mc.options.enableVsync().get())) f *= 0.80f;
+        if (MercurizerConfig.isEnabled(config.vsyncConservative)
+                && mc != null && Boolean.TRUE.equals(mc.options.enableVsync().get())) {
+            f *= 0.80f;
+        }
         return f;
     }
 
-    public static long getMinUploadBudgetNs() { return MercurizerFrameTracker.getDynamicMinBudgetNs(minUploadBudgetNs); }
-    public static float getBaseUploadFraction() { return uploadFraction; }
-    public static long getBaseMinUploadBudgetNs() { return minUploadBudgetNs; }
-    public static long getTextureAnimThresholdNs() { return textureAnimThresholdNs; }
+    public static long getMinUploadBudgetNs() {
+        long base = getBaseMinUploadBudgetNs();
+        if (!MercurizerConfig.isEnabled(MercurizerConfig.get().dynamicUploadScaling)) return base;
+        return MercurizerFrameTracker.getDynamicMinBudgetNs(base);
+    }
+
+    public static float getBaseUploadFraction() {
+        Float percent = MercurizerConfig.get().uploadFractionPercent;
+        return percent != null ? percent / 100f : uploadFraction;
+    }
+
+    public static long getBaseMinUploadBudgetNs() {
+        Float ms = MercurizerConfig.get().minUploadBudgetMs;
+        return ms != null ? (long) (ms * 1_000_000L) : minUploadBudgetNs;
+    }
+
+    public static long getTextureAnimThresholdNs() {
+        Integer ms = MercurizerConfig.get().textureAnimThresholdMs;
+        if (ms == null) return textureAnimThresholdNs;
+        return ms > MercurizerConfig.TEXTURE_THRESHOLD_MAX_MS ? Long.MAX_VALUE : ms * 1_000_000L;
+    }
+
+    public static float getBenchmarkUploadFraction() { return uploadFraction; }
+    public static long getBenchmarkMinUploadBudgetNs() { return minUploadBudgetNs; }
+    public static long getBenchmarkTextureAnimThresholdNs() { return textureAnimThresholdNs; }
+    public static MercurizerBenchmarkResult getAppliedResult() { return appliedResult; }
     public static MercurizerBenchmarkResult getLastResult() { return lastResult; }
 
     private static float gpuMultiplier(String renderer) {
