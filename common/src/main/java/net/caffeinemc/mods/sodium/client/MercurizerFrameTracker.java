@@ -42,6 +42,8 @@ public final class MercurizerFrameTracker {
     }
 
     public static long getUploadBudgetNs() { return uploadBudgetNs; }
+    public static long getConfiguredBudgetNs() { return configuredBudgetNs; }
+    public static boolean isRecovering() { return System.nanoTime() < recoveryUntilNs; }
     public static float getUploadFraction() {
         if (System.nanoTime() < recoveryUntilNs) return uploadFraction * 0.50f;
         return uploadFraction;
@@ -75,12 +77,12 @@ public final class MercurizerFrameTracker {
         return sum / n;
     }
 
-    public static void configure(long budgetNs, float fraction, long minBudgetNs) {
+    public static void configure(long budgetNs, float fraction, long minBudgetNs, boolean announce) {
         uploadBudgetNs = budgetNs;
         configuredBudgetNs = budgetNs;
         uploadFraction = fraction;
         minUploadBudgetNs = minBudgetNs;
-        LOGGER.info("[Mercurizer] Upload budget set: {}us, fraction: {}, min: {}us",
+        if (announce) LOGGER.info("[Mercurizer] Upload budget set: {}us, fraction: {}, min: {}us",
                 budgetNs / 1000, fraction, minBudgetNs / 1000);
     }
 
