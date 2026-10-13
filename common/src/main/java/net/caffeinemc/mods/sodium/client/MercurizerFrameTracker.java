@@ -119,8 +119,16 @@ public final class MercurizerFrameTracker {
         } else {
             currentFraction += (ideal - currentFraction) * 0.02f;
         }
-        if (System.nanoTime() < recoveryUntilNs) return Math.min(currentFraction, base * 0.50f);
         return currentFraction;
+    }
+
+    public static void resetDynamicValues() {
+        currentFraction = -1;
+        currentBudget = -1;
+    }
+
+    public static boolean isRecovering() {
+        return System.nanoTime() < recoveryUntilNs;
     }
 
     public static long getDynamicMinBudgetNs(long base) {

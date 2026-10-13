@@ -3,28 +3,25 @@
 #import <sodium:include/fog.glsl>
 #import <sodium:include/chunk_vertex.glsl>
 #import <sodium:include/chunk_matrices.glsl>
+#import <sodium:include/chunk_material.glsl>
 
 out vec4 v_Color;
 out vec2 v_TexCoord;
 
-flat out uint v_Material;
-
-#ifdef USE_FOG
-out vec2 v_FragDistance;
-out float fadeFactor;
+out float v_MaterialMipBias;
+#ifdef USE_FRAGMENT_DISCARD
+out float v_MaterialAlphaCutoff;
 #endif
 
+#ifdef USE_FOG
+out float v_FragDistance;
+#endif
+
+uniform int u_FogShape;
 uniform vec3 u_RegionOffset;
 uniform vec2 u_TexCoordShrink;
 
 uniform sampler2D u_LightTex; // The light map texture sampler
-
-uniform int u_CurrentTime;
-uniform float u_FadePeriodInv;
-
-layout(std140) uniform ChunkData {
-    ivec4 u_chunkFades[64]; // Packing into ivec4 is needed to avoid wasting 3KB...
-};
 
 uvec3 _get_relative_chunk_coord(uint pos) {
     // Packing scheme is defined by LocalSectionIndex
@@ -43,14 +40,7 @@ void main() {
     vec3 position = _vert_position + translation;
 
 #ifdef USE_FOG
-    v_FragDistance = getFragDistance(position);
-
-    int chunkId = int(_draw_id);
-    int chunkFade = u_chunkFades[chunkId >> 2][chunkId & 3];
-    int fadeTime = u_CurrentTime - chunkFade;
-    float elapsed = float(fadeTime);
-    float fade = clamp(float(u_CurrentTime - chunkFade) * u_FadePeriodInv, 0.0, 1.0);
-    fadeFactor = (chunkFade < 0) ? 1.0 : fade;
+    v_FragDistance = getFragDistance(u_FogShape, position);
 #endif
 
     // Transform the vertex position into model-view-projection space
@@ -60,5 +50,8 @@ void main() {
     v_Color = _vert_color * texture(u_LightTex, _vert_tex_light_coord);
     v_TexCoord = (_vert_tex_diffuse_coord_bias * u_TexCoordShrink) + _vert_tex_diffuse_coord; // FMA for precision
 
-    v_Material = _material_params;
+    v_MaterialMipBias = _material_mip_bias(_material_params);
+#ifdef USE_FRAGMENT_DISCARD
+    v_MaterialAlphaCutoff = _material_alpha_cutoff(_material_params);
+#endif
 }
