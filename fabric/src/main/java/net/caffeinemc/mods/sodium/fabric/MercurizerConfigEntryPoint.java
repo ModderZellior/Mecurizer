@@ -7,12 +7,11 @@ import net.caffeinemc.mods.sodium.client.MercurizerBenchmarkController;
 import net.caffeinemc.mods.sodium.client.MercurizerBenchmarkResult;
 import net.caffeinemc.mods.sodium.client.MercurizerBenchmarkScreen;
 import net.caffeinemc.mods.sodium.client.MercurizerCapabilities;
-import net.caffeinemc.mods.sodium.client.MercurizerConfigIcon;
 import net.caffeinemc.mods.sodium.client.MercurizerRuntimePolicy;
 import net.caffeinemc.mods.sodium.client.MercurizerTuning;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public class MercurizerConfigEntryPoint implements ConfigEntryPoint {
 
@@ -20,7 +19,7 @@ public class MercurizerConfigEntryPoint implements ConfigEntryPoint {
     public void registerConfigLate(ConfigBuilder builder) {
         var modOptions = builder.registerModOptions("mercurizer")
                 .setName("Mercurizer")
-                .setIcon(MercurizerConfigIcon.ID);
+                .setIcon(ResourceLocation.fromNamespaceAndPath("mercurizer", "textures/gui/config-icon.png"));
 
         var page = builder.createOptionPage()
                 .setName(Component.literal("Mercurizer"));
@@ -69,7 +68,7 @@ public class MercurizerConfigEntryPoint implements ConfigEntryPoint {
         }
 
         benchmarkGroup.addOption(
-                builder.createExternalButtonOption(Identifier.fromNamespaceAndPath("mercurizer", "rebenchmark"))
+                builder.createExternalButtonOption(ResourceLocation.fromNamespaceAndPath("mercurizer", "rebenchmark"))
                         .setName(Component.literal("Re-run GPU Benchmark"))
                         .setTooltip(Component.literal("Clears stored results and runs the benchmark again"))
                         .setScreenConsumer(parent -> {
@@ -117,7 +116,7 @@ public class MercurizerConfigEntryPoint implements ConfigEntryPoint {
     private static void addLabel(ConfigBuilder builder, OptionGroupBuilder group, String text) {
         group.addOption(
                 builder.createExternalButtonOption(
-                                Identifier.fromNamespaceAndPath("mercurizer", "info_" + Math.abs(text.hashCode())))
+                                ResourceLocation.fromNamespaceAndPath("mercurizer", "info_" + Math.abs(text.hashCode())))
                         .setName(Component.literal(text))
                         .setEnabled(false)
                         .setScreenConsumer(s -> {})

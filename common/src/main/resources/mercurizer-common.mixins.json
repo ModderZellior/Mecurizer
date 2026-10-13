@@ -8,12 +8,10 @@
   },
   "client": [
     "addon.ChunkBuilderMixin",
-    "addon.GlBufferStreamerMixin",
     "addon.RenderRegionManagerMixin",
     "addon.RenderSectionManagerMixin",
     "addon.ResourcePackScannerMixin",
-    "addon.SodiumConfigBuilderMixin",
-    "addon.SodiumDebugEntryMixin",
+    "addon.MercurizerDebugScreenOverlayMixin",
     "addon.SodiumWorldRendererMixin",
     "addon.MercurizerMinecraftMixin",
     "addon.MercurizerWindowMixin",
