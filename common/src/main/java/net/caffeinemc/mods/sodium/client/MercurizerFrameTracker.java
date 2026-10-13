@@ -7,6 +7,7 @@ public final class MercurizerFrameTracker {
     private static final Logger LOGGER = LoggerFactory.getLogger("Mercurizer");
 
     private static volatile long uploadBudgetNs = 2_000_000L;
+    private static volatile long configuredBudgetNs = 2_000_000L;
     private static volatile float uploadFraction = 0.25f;
     private static volatile long minUploadBudgetNs = 500_000L;
 
@@ -41,6 +42,8 @@ public final class MercurizerFrameTracker {
     }
 
     public static long getUploadBudgetNs() { return uploadBudgetNs; }
+    public static long getConfiguredBudgetNs() { return configuredBudgetNs; }
+    public static boolean isRecovering() { return System.nanoTime() < recoveryUntilNs; }
     public static float getUploadFraction() {
         if (System.nanoTime() < recoveryUntilNs) return uploadFraction * 0.50f;
         return uploadFraction;
@@ -73,11 +76,12 @@ public final class MercurizerFrameTracker {
         return sum / n;
     }
 
-    public static void configure(long budgetNs, float fraction, long minBudgetNs) {
+    public static void configure(long budgetNs, float fraction, long minBudgetNs, boolean announce) {
         uploadBudgetNs = budgetNs;
+        configuredBudgetNs = budgetNs;
         uploadFraction = fraction;
         minUploadBudgetNs = minBudgetNs;
-        LOGGER.info("[Mercurizer] Upload budget set: {}us, fraction: {}, min: {}us",
+        if (announce) LOGGER.info("[Mercurizer] Upload budget set: {}us, fraction: {}, min: {}us",
                 budgetNs / 1000, fraction, minBudgetNs / 1000);
     }
 

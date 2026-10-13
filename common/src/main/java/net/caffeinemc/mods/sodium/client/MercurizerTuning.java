@@ -23,20 +23,69 @@ public final class MercurizerTuning {
     public static void setLatestRaw(MercurizerBenchmarkResult r) { latestRaw = r; }
     public static MercurizerBenchmarkResult getLatestRaw() { return latestRaw; }
     public static MercurizerBenchmarkResult getLastResult() { return lastResult; }
-    public static float getBaseUploadFraction() { return baseUploadFraction; }
-    public static long getBaseMinUploadBudgetNs() { return baseMinUploadBudgetNs; }
-    public static long getTextureAnimThresholdNs() { return Long.MAX_VALUE; }
+    private static volatile MercurizerBenchmarkResult appliedResult = null;
+    private static volatile File appliedGameDirectory = null;
+
+    public static float getBaseUploadFraction() {
+        Float percent = MercurizerConfig.get().uploadFractionPercent;
+        return percent != null ? percent / 100f : baseUploadFraction;
+    }
+
+    public static long getBaseMinUploadBudgetNs() {
+        Float ms = MercurizerConfig.get().minUploadBudgetMs;
+        return ms != null ? (long) (ms * 1_000_000L) : baseMinUploadBudgetNs;
+    }
+
+    public static long getTextureAnimThresholdNs() {
+        Integer ms = MercurizerConfig.get().textureAnimThresholdMs;
+        if (ms == null || ms > MercurizerConfig.TEXTURE_THRESHOLD_MAX_MS) return Long.MAX_VALUE;
+        return ms * 1_000_000L;
+    }
+
     public static float getUploadFraction() {
-        float f = MercurizerFrameTracker.getUploadFraction();
+        MercurizerConfig.Values config = MercurizerConfig.get();
+        float f = getBaseUploadFraction();
+        if (MercurizerConfig.isEnabled(config.antiStutter) && MercurizerFrameTracker.isRecovering()) f *= 0.50f;
         Minecraft mc = Minecraft.getInstance();
-        if (mc != null && Boolean.TRUE.equals(mc.options.enableVsync().get())) f *= 0.80f;
+        if (MercurizerConfig.isEnabled(config.vsyncConservative)
+                && mc != null && Boolean.TRUE.equals(mc.options.enableVsync().get())) {
+            f *= 0.80f;
+        }
         return f;
     }
-    public static long getMinUploadBudgetNs() { return MercurizerFrameTracker.getUploadBudgetNs(); }
+
+    public static long getMinUploadBudgetNs() {
+        MercurizerConfig.Values config = MercurizerConfig.get();
+        if (config.minUploadBudgetMs != null) return (long) (config.minUploadBudgetMs * 1_000_000L);
+        if (!MercurizerConfig.isEnabled(config.dynamicUploadScaling)) return MercurizerFrameTracker.getConfiguredBudgetNs();
+        return MercurizerFrameTracker.getUploadBudgetNs();
+    }
+
+    public static float getBenchmarkUploadFraction() { return baseUploadFraction; }
+    public static long getBenchmarkMinUploadBudgetNs() { return MercurizerFrameTracker.getConfiguredBudgetNs(); }
+    public static long getBenchmarkTextureAnimThresholdNs() { return Long.MAX_VALUE; }
+    public static MercurizerBenchmarkResult getAppliedResult() { return appliedResult; }
+
+    public static void reapply() {
+        MercurizerBenchmarkResult benchmark = appliedResult;
+        if (benchmark == null) return;
+        MercurizerBenchmarkResult current = lastResult;
+        apply(benchmark, appliedGameDirectory, false);
+        if (current != null && current.isRefined && !MercurizerConfig.hasMeasurementOverrides()) {
+            lastResult = current;
+        }
+    }
 
     public static void apply(MercurizerBenchmarkResult result, File gameDirectory) {
-        if (result == null) return;
-        lastResult = result;
+        apply(result, gameDirectory, true);
+    }
+
+    private static void apply(MercurizerBenchmarkResult benchmark, File gameDirectory, boolean announce) {
+        if (benchmark == null) return;
+        lastResult = benchmark;
+        appliedResult = benchmark;
+        appliedGameDirectory = gameDirectory;
+        MercurizerBenchmarkResult result = MercurizerConfig.withMeasurementOverrides(benchmark);
 
         if (result.isLowConfidence) {
             LOGGER.warn("[Mercurizer] Low confidence benchmark result (high variance) — tuning may be inaccurate");
@@ -75,7 +124,7 @@ public final class MercurizerTuning {
             long roundTripFloor = (long)(scaledNs * 2.0);
             if (roundTripFloor > minUploadBudgetNs) {
                 minUploadBudgetNs = roundTripFloor;
-                LOGGER.info("[Mercurizer] Round-trip floor: {} us", roundTripFloor / 1000);
+                if (announce) LOGGER.info("[Mercurizer] Round-trip floor: {} us", roundTripFloor / 1000);
             }
         }
 
@@ -85,8 +134,8 @@ public final class MercurizerTuning {
         }
         baseUploadFraction = uploadFraction;
         baseMinUploadBudgetNs = minUploadBudgetNs;
-        MercurizerFrameTracker.configure(uploadBudgetNs, uploadFraction, minUploadBudgetNs);
-        LOGGER.info("[Mercurizer] Tuning applied — fraction={}, budget={}us, minBudget={}us",
+        MercurizerFrameTracker.configure(uploadBudgetNs, uploadFraction, minUploadBudgetNs, announce);
+        if (announce) LOGGER.info("[Mercurizer] Tuning applied — fraction={}, budget={}us, minBudget={}us",
                 String.format("%.2f", uploadFraction),
                 uploadBudgetNs / 1000,
                 minUploadBudgetNs / 1000);
@@ -95,6 +144,8 @@ public final class MercurizerTuning {
     public static void checkRefinement(File gameDirectory) {
         MercurizerBenchmarkResult lastResult = MercurizerTuning.lastResult;
         if (lastResult == null) return;
+        if (!MercurizerConfig.isEnabled(MercurizerConfig.get().adaptiveRefinement)) return;
+        if (MercurizerConfig.hasMeasurementOverrides()) return;
 
         float uploadFraction = MercurizerFrameTracker.getUploadFraction();
         long uploadBudgetNs = MercurizerFrameTracker.getUploadBudgetNs();

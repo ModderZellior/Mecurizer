@@ -25,12 +25,18 @@ public class MercurizerInfoScreen extends Screen {
         addRenderableWidget(Button.builder(
                 Component.literal("Re-run Benchmark"),
                 btn -> Minecraft.getInstance().setScreen(new MercurizerBenchmarkScreen(this.returnScreen)))
-                .bounds(centerX - 105, bottomY, 100, 20)
+                .bounds(centerX - 155, bottomY, 100, 20)
+                .build());
+
+        addRenderableWidget(Button.builder(
+                Component.literal("Config"),
+                btn -> Minecraft.getInstance().setScreen(new MercurizerConfigScreen(this)))
+                .bounds(centerX - 50, bottomY, 100, 20)
                 .build());
 
         addRenderableWidget(Button.builder(
                 Component.literal("Close"), btn -> onClose())
-                .bounds(centerX + 5, bottomY, 100, 20)
+                .bounds(centerX + 55, bottomY, 100, 20)
                 .build());
     }
 
@@ -101,17 +107,27 @@ public class MercurizerInfoScreen extends Screen {
 
         lines.add("");
         lines.add("§Active Tuning");
-        lines.add(String.format("Upload fraction: %.1f%%", MercurizerFrameTracker.getUploadFraction() * 100));
-        lines.add(String.format("Upload budget: %.3f ms", MercurizerFrameTracker.getUploadBudgetNs() / 1_000_000.0));
+        MercurizerConfig.Values config = MercurizerConfig.get();
+        lines.add(String.format("Upload fraction: %.1f%%", MercurizerTuning.getUploadFraction() * 100)
+                + configured(config.uploadFractionPercent));
+        lines.add(String.format("Upload budget: %.3f ms", MercurizerTuning.getMinUploadBudgetNs() / 1_000_000.0)
+                + configured(config.minUploadBudgetMs));
 
         lines.add("");
         lines.add("§Status");
-        lines.add("Dynamic upload scaling: Active");
-        if (result != null) {
-            lines.add("Adaptive refinement: " + (result.isRefined ? "Complete" : "Pending (play 2 min in stable scene)"));
+        lines.add("Dynamic upload scaling: " + (MercurizerConfig.isEnabled(config.dynamicUploadScaling) ? "Active" : "Off (config)"));
+        MercurizerBenchmarkResult applied = MercurizerTuning.getLastResult();
+        if (!MercurizerConfig.isEnabled(config.adaptiveRefinement)) {
+            lines.add("Adaptive refinement: Off (config)");
+        } else if (applied != null) {
+            lines.add("Adaptive refinement: " + (applied.isRefined ? "Complete" : "Pending (play 2 min in stable scene)"));
         }
 
         return lines;
+    }
+
+    private static String configured(Object override) {
+        return override != null ? " (config)" : "";
     }
 
     @Override
