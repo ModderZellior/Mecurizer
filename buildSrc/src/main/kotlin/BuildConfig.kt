@@ -1,4 +1,4 @@
-﻿import org.gradle.api.Project
+import org.gradle.api.Project
 
 object BuildConfig {
     val MINECRAFT_VERSION: String = "26.1"
@@ -7,7 +7,7 @@ object BuildConfig {
     val FABRIC_API_VERSION: String = "0.148.0+26.1.2"
     val SUPPORT_FRAPI : Boolean = true
 
-    val MOD_VERSION: String = "1.9"
+    val MOD_VERSION: String = "1.10"
 
     val RELEASE_TAG: String = "mc$MINECRAFT_VERSION-$MOD_VERSION"
 
