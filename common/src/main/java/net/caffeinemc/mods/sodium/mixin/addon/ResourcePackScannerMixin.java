@@ -13,7 +13,7 @@ import java.util.List;
 
 @Mixin(targets = "net.caffeinemc.mods.sodium.client.checks.ResourcePackScanner")
 public class ResourcePackScannerMixin {
-    @Inject(method = "determineIgnoredShaders", at = @At("RETURN"))
+    @Inject(method = "determineIgnoredShaders", at = @At("RETURN"), cancellable = true)
     private static void addMercurizerIgnoredShaders(
             PackResources resourcePack,
             CallbackInfoReturnable<List<String>> cir) {

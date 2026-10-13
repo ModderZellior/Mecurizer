@@ -41,6 +41,7 @@ public final class MercurizerBenchmarkController {
                 doneThisSession = true;
                 return false;
             }
+            MercurizerBenchmarkStore.incrementGameStartCount(gameDir);
             startupRunNumber = 1;
             return true;
         }

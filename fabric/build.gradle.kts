@@ -49,6 +49,8 @@ loom {
             appendProjectPathToConfigName = false
             ideConfigGenerated(true)
             runDir("run")
+            // Same stack settings the vanilla launcher uses for 26.3 (SDL needs the extra room)
+            vmArgs("-Xss1M", "-XX:StackShadowPages=32")
         }
     }
 }
