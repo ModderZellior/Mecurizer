@@ -1,4 +1,4 @@
-﻿import org.gradle.api.Project
+import org.gradle.api.Project
 
 object BuildConfig {
     val MINECRAFT_VERSION: String = "1.21.11"
@@ -10,7 +10,7 @@ object BuildConfig {
 
     val PARCHMENT_VERSION: String? = null
 
-    val MOD_VERSION: String = "1.0"
+    val MOD_VERSION: String = "1.1"
 
     val RELEASE_TAG: String = "mc$MINECRAFT_VERSION-$MOD_VERSION"
 
