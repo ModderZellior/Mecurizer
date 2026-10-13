@@ -12,5 +12,5 @@ public record MercurizerResourcePackMetadata(List<String> ignoredShaders) {
                     .apply(instance, MercurizerResourcePackMetadata::new)
     );
     public static final MetadataSectionType<MercurizerResourcePackMetadata> SERIALIZER =
-            new MetadataSectionType<>("mercurizer", CODEC);
+            MetadataSectionType.fromCodec("mercurizer", CODEC);
 }
