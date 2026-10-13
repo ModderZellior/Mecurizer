@@ -28,12 +28,18 @@ public class MercurizerInfoScreen extends Screen {
                     MercurizerBenchmarkController.resetForRebenchmark();
                     Minecraft.getInstance().setScreen(new MercurizerBenchmarkScreen(this.returnScreen));
                 })
-                .bounds(centerX - 105, bottomY, 100, 20)
+                .bounds(centerX - 155, bottomY, 100, 20)
+                .build());
+
+        addRenderableWidget(Button.builder(
+                Component.literal("Config"),
+                btn -> Minecraft.getInstance().setScreen(new MercurizerConfigScreen(this)))
+                .bounds(centerX - 50, bottomY, 100, 20)
                 .build());
 
         addRenderableWidget(Button.builder(
                 Component.literal("Close"), btn -> onClose())
-                .bounds(centerX + 5, bottomY, 100, 20)
+                .bounds(centerX + 55, bottomY, 100, 20)
                 .build());
     }
 
@@ -104,24 +110,35 @@ public class MercurizerInfoScreen extends Screen {
 
         lines.add("");
         lines.add("§Active Tuning");
-        lines.add(String.format("Upload fraction: %.1f%%", MercurizerTuning.getBaseUploadFraction() * 100));
-        lines.add(String.format("Min upload budget: %.3f ms", MercurizerTuning.getBaseMinUploadBudgetNs() / 1_000_000.0));
+        MercurizerConfig.Values config = MercurizerConfig.get();
+        lines.add(String.format("Upload fraction: %.1f%%", MercurizerTuning.getBaseUploadFraction() * 100)
+                + configured(config.uploadFractionPercent));
+        lines.add(String.format("Min upload budget: %.3f ms", MercurizerTuning.getBaseMinUploadBudgetNs() / 1_000_000.0)
+                + configured(config.minUploadBudgetMs));
         long texThresh = MercurizerTuning.getTextureAnimThresholdNs();
         lines.add("Texture animation: " + (texThresh == Long.MAX_VALUE
-                ? "Always on" : String.format("%.0f ms threshold", texThresh / 1_000_000.0)));
+                ? "Always on" : String.format("%.0f ms threshold", texThresh / 1_000_000.0))
+                + configured(config.textureAnimThresholdMs));
 
         lines.add("");
         lines.add("§Optimisation Status");
         boolean safePath = MercurizerRuntimePolicy.preferSafeStagingPath();
         lines.add("Safe staging path: " + (safePath ? "Active" : "Inactive"));
         lines.add("RGSS: " + (safePath ? "Disabled (safe staging active)" : "Active"));
-        lines.add("Dynamic upload scaling: Active");
-        lines.add("Texture animation throttle: Active");
-        if (result != null) {
-            lines.add("Adaptive refinement: " + (result.isRefined ? "Complete" : "Pending (play 30s in a stable scene)"));
+        lines.add("Dynamic upload scaling: " + (MercurizerConfig.isEnabled(config.dynamicUploadScaling) ? "Active" : "Off (config)"));
+        lines.add("Texture animation throttle: " + (texThresh == Long.MAX_VALUE ? "Off" : "Active"));
+        MercurizerBenchmarkResult applied = MercurizerTuning.getLastResult();
+        if (!MercurizerConfig.isEnabled(config.adaptiveRefinement)) {
+            lines.add("Adaptive refinement: Off (config)");
+        } else if (applied != null) {
+            lines.add("Adaptive refinement: " + (applied.isRefined ? "Complete" : "Pending (play 30s in a stable scene)"));
         }
 
         return lines;
+    }
+
+    private static String configured(Object override) {
+        return override != null ? " (config)" : "";
     }
 
     @Override

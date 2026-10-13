@@ -14,9 +14,6 @@ public class ChunkBuilderMixin {
             at = @At(value = "INVOKE",
                     target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/compile/executor/ChunkBuilder;getOptimalThreadCount()I"))
     private static int wrapGetOptimalThreadCount(Operation<Integer> original) {
-        if (MercurizerRuntimePolicy.preferSafeStagingPath()) {
-            return 1;
-        }
         return MercurizerRuntimePolicy.getEffectiveChunkWorkerCount(original.call());
     }
 }
