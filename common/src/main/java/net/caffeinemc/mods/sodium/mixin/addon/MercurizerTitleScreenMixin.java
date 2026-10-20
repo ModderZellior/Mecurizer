@@ -15,6 +15,7 @@ import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -23,9 +24,17 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class MercurizerTitleScreenMixin extends Screen {
     protected MercurizerTitleScreenMixin() { super(null); }
 
-    @Inject(method = "init", at = @At("TAIL"))
+    @Unique
+    private boolean mercurizer$screensChecked;
+
+    // runs on the first tick instead of in init: mods like rrls build the title screen while
+    // Minecraft is still constructing, and showing another screen there renders too early
+    @Inject(method = "tick", at = @At("HEAD"))
     private void checkScreens(CallbackInfo ci) {
+        if (this.mercurizer$screensChecked) return;
+        this.mercurizer$screensChecked = true;
         Minecraft mc = Minecraft.getInstance();
+        if (mc.gui.screen() != (Object) this) return;
         if (MercurizerBenchmarkController.shouldShowBenchmarkScreen(mc)) {
             mc.setScreenAndShow(new MercurizerBenchmarkScreen((Screen) (Object) this));
             return;
